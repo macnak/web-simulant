@@ -1,0 +1,141 @@
+=== Fixed Latency Workload ===
+Testing fixed delays at moderate concurrency
+
+Test 1: 10ms fixed latency (100 concurrent, 1000 requests)
+Summary:
+  Success rate:	100.00%
+  Total:	121.9242 ms
+  Slowest:	13.2946 ms
+  Fastest:	10.2908 ms
+  Average:	11.6606 ms
+  Requests/sec:	8201.8151
+
+  Total data:	36.13 KiB
+  Size/request:	37 B
+  Size/sec:	296.35 KiB
+
+Response time histogram:
+  10.291 ms [1]   |
+  10.591 ms [13]  |■
+  10.892 ms [64]  |■■■■■■
+  11.192 ms [102] |■■■■■■■■■■
+  11.492 ms [110] |■■■■■■■■■■■
+  11.793 ms [257] |■■■■■■■■■■■■■■■■■■■■■■■■■■
+  12.093 ms [309] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  12.393 ms [100] |■■■■■■■■■■
+  12.694 ms [36]  |■■■
+  12.994 ms [1]   |
+  13.295 ms [7]   |
+
+Response time distribution:
+  10.00% in 10.9798 ms
+  25.00% in 11.3772 ms
+  50.00% in 11.7500 ms
+  75.00% in 11.9460 ms
+  90.00% in 12.1660 ms
+  95.00% in 12.3359 ms
+  99.00% in 12.5705 ms
+  99.90% in 13.2946 ms
+  99.99% in 13.2946 ms
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.2377 ms, 0.0553 ms, 0.8628 ms
+  DNS-lookup:	0.0067 ms, 0.0007 ms, 0.0834 ms
+
+Status code distribution:
+  [200] 1000 responses
+
+Test 2: 50ms fixed latency (100 concurrent, 1000 requests)
+Summary:
+  Success rate:	100.00%
+  Total:	521.5064 ms
+  Slowest:	53.4502 ms
+  Fastest:	50.2811 ms
+  Average:	51.7292 ms
+  Requests/sec:	1917.5221
+
+  Total data:	36.13 KiB
+  Size/request:	37 B
+  Size/sec:	69.29 KiB
+
+Response time histogram:
+  50.281 ms [1]   |
+  50.598 ms [20]  |■
+  50.915 ms [46]  |■■■
+  51.232 ms [19]  |■
+  51.549 ms [132] |■■■■■■■■■
+  51.866 ms [431] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  52.183 ms [273] |■■■■■■■■■■■■■■■■■■■■
+  52.499 ms [64]  |■■■■
+  52.816 ms [4]   |
+  53.133 ms [1]   |
+  53.450 ms [9]   |
+
+Response time distribution:
+  10.00% in 51.3252 ms
+  25.00% in 51.5912 ms
+  50.00% in 51.7837 ms
+  75.00% in 51.9261 ms
+  90.00% in 52.1150 ms
+  95.00% in 52.2787 ms
+  99.00% in 53.1303 ms
+  99.90% in 53.4502 ms
+  99.99% in 53.4502 ms
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.2151 ms, 0.0456 ms, 0.8758 ms
+  DNS-lookup:	0.0065 ms, 0.0007 ms, 0.0561 ms
+
+Status code distribution:
+  [200] 1000 responses
+
+Test 3: 100ms fixed latency (100 concurrent, 1000 requests)
+Summary:
+  Success rate:	100.00%
+  Total:	1019.3133 ms
+  Slowest:	103.2287 ms
+  Fastest:	100.2068 ms
+  Average:	101.5964 ms
+  Requests/sec:	981.0527
+
+  Total data:	37.11 KiB
+  Size/request:	38 B
+  Size/sec:	36.41 KiB
+
+Response time histogram:
+  100.207 ms [1]   |
+  100.509 ms [24]  |■■
+  100.811 ms [24]  |■■
+  101.113 ms [45]  |■■■■
+  101.416 ms [247] |■■■■■■■■■■■■■■■■■■■■■■■
+  101.718 ms [330] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  102.020 ms [169] |■■■■■■■■■■■■■■■■
+  102.322 ms [89]  |■■■■■■■■
+  102.624 ms [35]  |■■■
+  102.927 ms [19]  |■
+  103.229 ms [17]  |■
+
+Response time distribution:
+  10.00% in 101.1270 ms
+  25.00% in 101.3148 ms
+  50.00% in 101.5495 ms
+  75.00% in 101.8343 ms
+  90.00% in 102.2007 ms
+  95.00% in 102.4475 ms
+  99.00% in 103.0183 ms
+  99.90% in 103.2287 ms
+  99.99% in 103.2287 ms
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.2522 ms, 0.0521 ms, 0.8086 ms
+  DNS-lookup:	0.0053 ms, 0.0008 ms, 0.0496 ms
+
+Status code distribution:
+  [200] 1000 responses
+
+=== Fixed Latency Complete ===
+Expected: p50/p95/p99 should be close to configured latency
+Tolerance: within 10% for >=100 samples

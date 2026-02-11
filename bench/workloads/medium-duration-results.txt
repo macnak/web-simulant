@@ -1,0 +1,74 @@
+=== Medium-Duration Stability Test ===
+Duration: 10 minutes
+Target TPS: 500
+Concurrency: 100
+Latency: 50ms
+Error rate: 1%
+
+Note: This test is indicative only. Results may differ significantly
+      in Docker or on different hardware. Current environment: WSL2
+
+Starting at: Wed Feb 11 11:26:13 AEDT 2026
+
+Total requests to send: 300000
+Estimated completion: Wed Feb 11 11:36:13 AEDT 2026
+
+Monitor CPU usage in another terminal:
+  watch -n 2 'ps aux | grep web-simulant-bench | grep -v grep'
+
+Summary:
+  Success rate:	100.00%
+  Total:	155773.7332 ms
+  Slowest:	54.8948 ms
+  Fastest:	50.1755 ms
+  Average:	51.9078 ms
+  Requests/sec:	1925.8703
+
+  Total data:	10.60 MiB
+  Size/request:	37 B
+  Size/sec:	69.70 KiB
+
+Response time histogram:
+  50.175 ms [1]      |
+  50.647 ms [1441]   |
+  51.119 ms [15888]  |■■■■
+  51.591 ms [63160]  |■■■■■■■■■■■■■■■■■■
+  52.063 ms [112035] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  52.535 ms [73478]  |■■■■■■■■■■■■■■■■■■■■
+  53.007 ms [26376]  |■■■■■■■
+  53.479 ms [6381]   |■
+  53.951 ms [1139]   |
+  54.423 ms [89]     |
+  54.895 ms [12]     |
+
+Response time distribution:
+  10.00% in 51.2708 ms
+  25.00% in 51.5643 ms
+  50.00% in 51.8820 ms
+  75.00% in 52.2275 ms
+  90.00% in 52.5795 ms
+  95.00% in 52.8064 ms
+  99.00% in 53.2623 ms
+  99.90% in 53.7736 ms
+  99.99% in 54.1979 ms
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	0.1168 ms, 0.0099 ms, 1.1830 ms
+  DNS-lookup:	0.0095 ms, 0.0007 ms, 0.4564 ms
+
+Status code distribution:
+  [200] 297000 responses
+  [500] 3000 responses
+
+=== Stability Test Complete ===
+Completed at: Wed Feb 11 11:28:48 AEDT 2026
+
+Assessment criteria:
+- No crashes or panics
+- Stable memory usage
+- Reasonable CPU usage (depends on hardware)
+- Distribution accuracy maintained
+
+Note: Results are from WSL2 Ubuntu (12 cores/24 threads, fast memory).
+      Docker deployment may show different characteristics.

@@ -1,0 +1,96 @@
+=== High Concurrency Stress Test ===
+Testing at 5k and 10k concurrent connections
+
+Test 1: 5k concurrent, 50ms latency (50k total requests)
+Summary:
+  Success rate:	100.00%
+  Total:	796.7985 ms
+  Slowest:	269.5153 ms
+  Fastest:	50.1827 ms
+  Average:	60.9671 ms
+  Requests/sec:	62751.1185
+
+  Total data:	1.76 MiB
+  Size/request:	37 B
+  Size/sec:	2.21 MiB
+
+Response time histogram:
+   50.183 ms [1]     |
+   72.116 ms [44999] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+   94.049 ms [35]    |
+  115.982 ms [681]   |
+  137.916 ms [3305]  |■■
+  159.849 ms [0]     |
+  181.782 ms [510]   |
+  203.716 ms [2]     |
+  225.649 ms [254]   |
+  247.582 ms [2]     |
+  269.515 ms [211]   |
+
+Response time distribution:
+  10.00% in 51.2456 ms
+  25.00% in 51.6817 ms
+  50.00% in 52.2829 ms
+  75.00% in 53.1321 ms
+  90.00% in 91.5572 ms
+  95.00% in 125.5178 ms
+  99.00% in 179.7253 ms
+  99.90% in 264.3488 ms
+  99.99% in 266.9827 ms
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	62.0596 ms, 4.1017 ms, 207.7012 ms
+  DNS-lookup:	0.0038 ms, 0.0007 ms, 0.1087 ms
+
+Status code distribution:
+  [200] 50000 responses
+
+Test 2: 10k concurrent, 50ms latency (100k total requests)
+Warning: This may saturate resources - monitor CPU and memory
+Summary:
+  Success rate:	100.00%
+  Total:	951.2894 ms
+  Slowest:	372.3830 ms
+  Fastest:	50.3027 ms
+  Average:	68.2175 ms
+  Requests/sec:	105120.4809
+
+  Total data:	3.53 MiB
+  Size/request:	37 B
+  Size/sec:	3.71 MiB
+
+Response time histogram:
+   50.303 ms [1]     |
+   82.511 ms [88710] |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+  114.719 ms [2002]  |
+  146.927 ms [4098]  |■
+  179.135 ms [2243]  |
+  211.343 ms [1399]  |
+  243.551 ms [551]   |
+  275.759 ms [499]   |
+  307.967 ms [251]   |
+  340.175 ms [175]   |
+  372.383 ms [71]    |
+
+Response time distribution:
+  10.00% in 52.4309 ms
+  25.00% in 53.7876 ms
+  50.00% in 55.9005 ms
+  75.00% in 59.9897 ms
+  90.00% in 105.6264 ms
+  95.00% in 148.5013 ms
+  99.00% in 240.8234 ms
+  99.90% in 329.3646 ms
+  99.99% in 359.1060 ms
+
+
+Details (average, fastest, slowest):
+  DNS+dialup:	83.0746 ms, 7.7844 ms, 275.0617 ms
+  DNS-lookup:	0.0035 ms, 0.0007 ms, 0.1598 ms
+
+Status code distribution:
+  [200] 100000 responses
+
+=== High Concurrency Complete ===
+Check for: CPU usage, memory stability, distribution accuracy

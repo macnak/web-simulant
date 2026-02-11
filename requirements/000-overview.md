@@ -6,6 +6,14 @@ To produce a web simulation application. Docker image based system to simulate w
 
 This document is intended to eliminate assumptions, identify all gaps, and define decision criteria before any implementation starts. Any item marked as a gap is explicitly unknown and must be resolved.
 
+Related documents:
+
+- requirements/001-phased-plan.md
+- requirements/010-requirements.md
+- requirements/020-design.md
+- requirements/030-stack-evaluation.md
+- requirements/990-project-memory.md
+
 ## 2. Goals
 
 The goals of this project are to cover the following areas:
@@ -171,19 +179,59 @@ Define measurable thresholds for the following:
 
 ## 9. API Design
 
-- Public API: simulation endpoints defined by configuration.
-- Admin API (later phase): CRUD operations for scenarios, workflows, and distributions.
+### Engine API (Port 8080)
+
+- User-defined simulation endpoints matching configured paths and methods
+- Request handling: match endpoint → apply overrides → sample distribution → inject errors → respond
+- Dynamic behavior based on configuration (latency distributions, error profiles, network conditions)
+
+### Control Plane API (Port 8081)
+
+- Web UI: `GET /` - Configuration dashboard
+- Health: `GET /admin/health` - Server health check
+- Metrics: `GET /admin/metrics` - JSON metrics export
+- Endpoints: `/api/endpoints` - CRUD operations for endpoint definitions
+- Workflows: `/api/workflows` - CRUD operations for workflow definitions
+- Config: `/api/config/import` and `/api/config/export` - YAML/JSON import/export
+
+### Configuration Format
+
+- Persisted as YAML or JSON
+- Schema: endpoints, workflows, groups with latency distributions, error profiles, network profiles
+- Override precedence: workflow > endpoint defaults
+- Validation rules: reject invalid distributions, duplicate endpoints, conflicting workflow assignments
+
+### Additional Design Notes
+
 - Error model: map simulated error conditions to HTTP status and payload (including HTTP 200 with error payload).
 - Rate limiting: behavior should be configurable per endpoint or workflow using TPS or TPH style limits; bandwidth limits apply to total bytes regardless of concurrency.
 - Concurrency semantics: concurrency caps should apply per endpoint or group/workflow where defined; combined TPS can be below limits even with many sessions.
 
 ## 10. UI/UX Requirements
 
-- UI flows (first release): add API endpoints and configure behavior for each endpoint.
-- UI for importing/exporting configs (download/upload) in the first release.
-- UI flows (later phase): create scenarios, edit behavior, save versions, select active scenario.
-- UI for editing distributions and workflows (later phase).
-- UI for OpenAPI import to seed endpoints and expected input/output behavior (later phase).
+### UI Access (Phase 1)
+
+- Web dashboard available at: `http://localhost:8081/`
+- Simple, form-based interface for configuration management
+- No authentication in Phase 1 (bind to localhost for security)
+
+### Phase 1 UI Features
+
+- Dashboard overview of configured endpoints
+- Add/edit/delete endpoint configurations
+- Configure latency distributions (Normal, Exponential, Uniform, Fixed)
+- Configure error injection patterns
+- Import/export configuration (YAML/JSON via download/upload)
+- View basic metrics (request counts, latencies, error rates)
+
+### Later Phase UI Features
+
+- Create and manage workflows with endpoint groups
+- Edit distributions with visual preview
+- Save configuration versions with rollback capability
+- Select active scenario from saved configurations
+- OpenAPI import to seed endpoints and expected input/output behavior
+- Time-series metrics visualization
 
 ## 11. Observability and Diagnostics
 
@@ -247,12 +295,25 @@ This section defines how technology choices will be evaluated and scored.
 - Community and long-term support
 - Integration with control plane and UI stack
 
+Weights (initial):
+
+- Performance 45
+- Safety 20
+- Operability 15
+- Ecosystem 10
+- Development velocity 5
+- Hiring availability 5
+
 ### 15.3 Scoring Matrix (Gap)
 
 Provide a weighted scoring table once criteria and weights are agreed.
 
 - Scoring scale: 1 (poor) to 5 (excellent)
-- Gap: Define weights for each criterion and target minimum thresholds.
+- Target minimum thresholds (initial):
+  - Must support single executable or single Docker image distribution
+  - Must sustain 8 to 12 hour soak without failure
+  - Hot reload is optional for first release; required later
+  - Simple UI for configuration is required in first release; OpenAPI import is later
 - Gap: Apply scoring with evidence and references.
 
 ## 16. Project Scoring (Gap)
