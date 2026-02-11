@@ -1,0 +1,55 @@
+[package]
+name = "web-simulant"
+version = "1.0.0"
+edition = "2021"
+authors = ["Web Simulant Team"]
+description = "Web API simulation for performance testing"
+license = "MIT"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# HTTP server framework
+axum = { version = "0.7", features = ["multipart"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.5", features = ["fs", "trace", "cors"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Random number generation for distributions
+rand = "0.8"
+rand_distr = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP types
+http = "1.0"
+mime = "0.3"
+
+[dev-dependencies]
+# Testing utilities
+reqwest = { version = "0.11", features = ["json", "multipart"] }
+tempfile = "3.8"
+
+[[bin]]
+name = "web-simulant"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

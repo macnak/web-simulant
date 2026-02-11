@@ -1,0 +1,149 @@
+# Unreliable External API Simulation
+#
+# Simulates an unreliable third-party API for resilience testing.
+# Demonstrates: high error rates, varied latencies, realistic failure scenarios
+
+version: "1.0"
+metadata:
+  name: "unreliable-external-api"
+  description: "Simulates unreliable third-party service for resilience testing"
+  author: "web-simulant-team"
+  created: "2026-02-11T10:00:00Z"
+
+endpoints:
+  # Weather API - somewhat unreliable, variable latency
+  - id: "get-weather"
+    method: "GET"
+    path: "/api/weather"
+    latency:
+      distribution: "uniform"
+      params:
+        min_ms: 200
+        max_ms: 800
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+        X-Rate-Limit-Remaining: "95"
+      body: |
+        {
+          "location": "San Francisco, CA",
+          "temperature": 18.5,
+          "conditions": "Partly Cloudy",
+          "humidity": 65,
+          "wind_speed": 12.5,
+          "timestamp": "2026-02-11T10:00:00Z"
+        }
+    error_profile:
+      rate: 0.10
+      codes: [429, 500, 503, 504]
+      body: '{"error": "Weather service temporarily unavailable", "retry_after": 30}'
+
+  # Payment gateway - critical but occasionally fails
+  - id: "process-payment"
+    method: "POST"
+    path: "/api/payments"
+    latency:
+      distribution: "exponential"
+      params:
+        rate: 0.004
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+        X-Transaction-Id: "txn-abc123"
+      body: |
+        {
+          "transaction_id": "txn-abc123",
+          "status": "authorized",
+          "amount": 129.99,
+          "currency": "USD",
+          "authorization_code": "AUTH456789"
+        }
+    error_profile:
+      rate: 0.08
+      codes: [402, 500, 502, 503, 504]
+      body: '{"error": "Payment gateway error", "code": "GATEWAY_ERROR", "retry_allowed": true}'
+
+  # Rate-limited API - frequent 429 errors
+  - id: "geocode-address"
+    method: "GET"
+    path: "/api/geocode"
+    latency:
+      distribution: "normal"
+      params:
+        mean_ms: 180
+        stddev_ms: 50
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+        X-Rate-Limit-Limit: "100"
+        X-Rate-Limit-Remaining: "5"
+      body: |
+        {
+          "address": "123 Main St, San Francisco, CA",
+          "latitude": 37.7749,
+          "longitude": -122.4194,
+          "accuracy": "rooftop"
+        }
+    error_profile:
+      rate: 0.15
+      codes: [429, 503]
+      body: '{"error": "Rate limit exceeded", "retry_after": 60}'
+
+  # Legacy system - slow and unreliable
+  - id: "legacy-lookup"
+    method: "GET"
+    path: "/api/legacy/lookup"
+    latency:
+      distribution: "uniform"
+      params:
+        min_ms: 500
+        max_ms: 2000
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/xml"
+        X-Legacy-System: "mainframe-1"
+      body: |
+        <?xml version="1.0"?>
+        <response>
+          <status>success</status>
+          <data>
+            <id>12345</id>
+            <name>Legacy Record</name>
+          </data>
+        </response>
+    error_profile:
+      rate: 0.20
+      codes: [500, 502, 503, 504]
+      body: '<?xml version="1.0"?><error><message>Legacy system unavailable</message></error>'
+
+  # Occasional timeout simulation - very slow
+  - id: "slow-report"
+    method: "GET"
+    path: "/api/reports/generate"
+    latency:
+      distribution: "uniform"
+      params:
+        min_ms: 1000
+        max_ms: 5000
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+        X-Processing-Time: "4237ms"
+      body: |
+        {
+          "report_id": "rpt-xyz789",
+          "status": "completed",
+          "rows": 15420,
+          "generated_at": "2026-02-11T10:00:00Z"
+        }
+    error_profile:
+      rate: 0.25
+      codes: [408, 500, 503, 504]
+      body: '{"error": "Report generation timeout", "code": "TIMEOUT"}'
+
+workflows: []

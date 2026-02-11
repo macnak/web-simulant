@@ -1,0 +1,33 @@
+# Simple Health Check Example
+#
+# Basic configuration with a single health check endpoint.
+# Demonstrates: minimal configuration, fixed latency, no errors
+
+version: "1.0"
+metadata:
+  name: "simple-health-check"
+  description: "Single health check endpoint with fixed latency"
+  author: "web-simulant-team"
+  created: "2026-02-11T10:00:00Z"
+
+endpoints:
+  - id: "health"
+    method: "GET"
+    path: "/health"
+    latency:
+      distribution: "fixed"
+      params:
+        delay_ms: 5
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+      body: |
+        {
+          "status": "healthy",
+          "timestamp": "2026-02-11T10:00:00Z"
+        }
+    error_profile:
+      rate: 0
+
+workflows: []

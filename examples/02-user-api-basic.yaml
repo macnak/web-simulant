@@ -1,0 +1,154 @@
+# User API - Basic CRUD
+#
+# Basic user management API with common operations.
+# Demonstrates: multiple endpoints, normal distribution, low error rates
+
+version: "1.0"
+metadata:
+  name: "user-api-basic"
+  description: "Basic user management API with CRUD operations"
+  author: "web-simulant-team"
+  created: "2026-02-11T10:00:00Z"
+
+endpoints:
+  # List users - fast read from cache
+  - id: "list-users"
+    method: "GET"
+    path: "/api/users"
+    latency:
+      distribution: "normal"
+      params:
+        mean_ms: 50
+        stddev_ms: 10
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+        Cache-Control: "max-age=60"
+      body: |
+        {
+          "users": [
+            {
+              "id": "u1",
+              "name": "Alice Anderson",
+              "email": "alice@example.com",
+              "role": "admin"
+            },
+            {
+              "id": "u2",
+              "name": "Bob Brown",
+              "email": "bob@example.com",
+              "role": "user"
+            },
+            {
+              "id": "u3",
+              "name": "Carol Chen",
+              "email": "carol@example.com",
+              "role": "user"
+            }
+          ],
+          "total": 3
+        }
+    error_profile:
+      rate: 0.001
+      codes: [500]
+      body: '{"error": "Database connection timeout"}'
+
+  # Get single user - very fast (cached)
+  - id: "get-user"
+    method: "GET"
+    path: "/api/users/me"
+    latency:
+      distribution: "fixed"
+      params:
+        delay_ms: 10
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+        Cache-Control: "max-age=300"
+      body: |
+        {
+          "id": "u1",
+          "name": "Alice Anderson",
+          "email": "alice@example.com",
+          "role": "admin",
+          "created_at": "2025-01-15T08:30:00Z",
+          "last_login": "2026-02-11T09:45:00Z"
+        }
+    error_profile:
+      rate: 0
+
+  # Create user - slower write operation
+  - id: "create-user"
+    method: "POST"
+    path: "/api/users"
+    latency:
+      distribution: "normal"
+      params:
+        mean_ms: 150
+        stddev_ms: 30
+    response:
+      status: 201
+      headers:
+        Content-Type: "application/json"
+        Location: "/api/users/u123"
+      body: |
+        {
+          "id": "u123",
+          "name": "New User",
+          "email": "newuser@example.com",
+          "role": "user",
+          "created_at": "2026-02-11T10:00:00Z"
+        }
+    error_profile:
+      rate: 0.02
+      codes: [400, 500]
+      body: '{"error": "Failed to create user", "code": "USER_CREATE_ERROR"}'
+
+  # Update user - moderate write operation
+  - id: "update-user"
+    method: "PUT"
+    path: "/api/users/me"
+    latency:
+      distribution: "normal"
+      params:
+        mean_ms: 120
+        stddev_ms: 25
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+      body: |
+        {
+          "id": "u1",
+          "name": "Alice Anderson (Updated)",
+          "email": "alice@example.com",
+          "role": "admin",
+          "updated_at": "2026-02-11T10:00:00Z"
+        }
+    error_profile:
+      rate: 0.01
+      codes: [409, 500]
+      body: '{"error": "Conflict or server error", "code": "USER_UPDATE_ERROR"}'
+
+  # Delete user - slower operation with higher error rate
+  - id: "delete-user"
+    method: "DELETE"
+    path: "/api/users/archive"
+    latency:
+      distribution: "normal"
+      params:
+        mean_ms: 200
+        stddev_ms: 40
+    response:
+      status: 204
+      headers:
+        Content-Type: "application/json"
+      body: ""
+    error_profile:
+      rate: 0.03
+      codes: [404, 409, 500]
+      body: '{"error": "Cannot delete user", "code": "USER_DELETE_ERROR"}'
+
+workflows: []

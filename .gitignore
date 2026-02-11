@@ -1,0 +1,26 @@
+# Rust
+/target/
+Cargo.lock
+
+# Config directory
+/config/*.yaml
+/config/*.json
+!/config/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test results
+*.txt
+!requirements.txt

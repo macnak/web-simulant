@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  web-simulant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: web-simulant
+    ports:
+      - "8080:8080" # Engine: simulated API endpoints
+      - "8081:8081" # Control Plane: admin UI and config management
+    volumes:
+      - ./config:/app/config # Persist active config
+      - ./examples:/app/examples # Access example configs
+    environment:
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  config:
+    driver: local
