@@ -107,6 +107,10 @@ curl http://localhost:8080/health
 - Real-time endpoint monitoring
 - Config import/export interface
 
+## Latency Profiles
+
+Each endpoint uses a latency profile to shape response timing (Fixed, Normal, Exponential, Uniform). For detailed behavior notes, tuning guidance, and configuration examples, see [API.md](API.md).
+
 ## Features
 
 ### Phase 1 (Complete ✓)

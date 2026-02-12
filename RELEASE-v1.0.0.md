@@ -14,6 +14,7 @@
 ## ✅ Major Features
 
 ### 1. **Web API Engine** (Port 8080)
+
 - Simulates realistic API behavior with configurable endpoints
 - Four latency distribution types: Fixed, Normal, Exponential, Uniform
 - Error injection with configurable rates
@@ -23,6 +24,7 @@
 - Sub-millisecond response time overhead
 
 ### 2. **Control Plane API** (Port 8081)
+
 - YAML/JSON configuration upload and download
 - Real-time config import with immediate effect
 - Configuration validation (dry-run mode)
@@ -31,6 +33,7 @@
 - Atomic config persistence
 
 ### 3. **Web Dashboard**
+
 - Single-page application (HTML + CSS + vanilla JS)
 - Drag-and-drop config upload
 - Real-time endpoint monitoring
@@ -39,6 +42,7 @@
 - Dark theme with responsive design
 
 ### 4. **Configuration Management**
+
 - YAML and JSON support with auto-detection
 - 4 complete example configurations
 - Request body pattern matching
@@ -47,6 +51,7 @@
 - Validation with detailed error messages
 
 ### 5. **Deployment Options**
+
 - Docker image (~120MB on Alpine Linux)
 - Docker Compose for instant local setup
 - Native binary builds (single executable)
@@ -70,6 +75,7 @@
 ## 🚀 Quick Start
 
 ### Docker Compose (Recommended)
+
 ```bash
 git clone https://github.com/yourusername/web-simulant
 cd web-simulant
@@ -79,17 +85,20 @@ docker-compose up --build
 Then open your browser: **http://localhost:8081/**
 
 ### Docker
+
 ```bash
 docker run -p 8080:8080 -p 8081:8081 web-simulant:v1.0.0
 ```
 
 ### Native Build
+
 ```bash
 cargo build --release
 ./target/release/web-simulant
 ```
 
 Test with:
+
 ```bash
 curl http://localhost:8081/api/health
 curl http://localhost:8080/health
@@ -136,12 +145,12 @@ endpoints:
 
 Benchmarks on modern hardware (8-core CPU, 16GB RAM):
 
-| Scenario | Throughput | Latency | Concurrency |
-|----------|-----------|---------|------------|
-| Fixed 100ms | 4,500 req/sec | 100ms ±<1ms | 1,000 |
-| Normal dist | 4,200 req/sec | 100ms ±20ms | 1,000 |
-| 5% errors | 4,500 req/sec | 100ms | 1,000 |
-| 25 endpoints | 4,000 req/sec | 100ms | 1,000 |
+| Scenario     | Throughput    | Latency     | Concurrency |
+| ------------ | ------------- | ----------- | ----------- |
+| Fixed 100ms  | 4,500 req/sec | 100ms ±<1ms | 1,000       |
+| Normal dist  | 4,200 req/sec | 100ms ±20ms | 1,000       |
+| 5% errors    | 4,500 req/sec | 100ms       | 1,000       |
+| 25 endpoints | 4,000 req/sec | 100ms       | 1,000       |
 
 Memory usage: ~50–100MB (depends on config complexity)
 
@@ -154,7 +163,7 @@ Memory usage: ~50–100MB (depends on config complexity)
 ✅ **Client Validation** - Test how your app handles errors and delays  
 ✅ **Performance Regression** - Detect performance regressions early  
 ✅ **Integration Testing** - Replace external APIs in test environments  
-✅ **Training & Demos** - Show API behavior under various conditions  
+✅ **Training & Demos** - Show API behavior under various conditions
 
 ---
 
@@ -195,18 +204,21 @@ Memory usage: ~50–100MB (depends on config complexity)
 ## 🔮 Roadmap
 
 ### v1.1 (Planned)
+
 - UI endpoint editor (add/edit/delete)
 - OpenAPI/Swagger integration
 - Authentication and authorization
 - Request rate limiting
 
 ### v1.2 (Planned)
+
 - Prometheus metrics export
 - Grafana dashboard templates
 - Webhook callbacks on errors
 - Advanced scenario workflows
 
 ### v2.0 (Planned)
+
 - Multi-node clustering
 - Distributed config management
 - Advanced load profiles
@@ -225,6 +237,7 @@ MIT License - See LICENSE file for details
 Contributions welcome! Please see [GitHub Issues](https://github.com/yourusername/web-simulant/issues) for current roadmap.
 
 **To contribute**:
+
 1. Fork the repository
 2. Create a feature branch
 3. Submit a pull request
@@ -242,13 +255,14 @@ Contributions welcome! Please see [GitHub Issues](https://github.com/yourusernam
 ## 🏆 Acknowledgments
 
 Built with ❤️ using:
+
 - Rust and the Tokio ecosystem
 - Axum web framework
 - The open-source community
 
 ---
 
-**Web Simulant v1.0.0** - *Your API simulation engine, ready for production.*
+**Web Simulant v1.0.0** - _Your API simulation engine, ready for production._
 
 Download: https://hub.docker.com/r/yourusername/web-simulant:v1.0.0
 

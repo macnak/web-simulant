@@ -355,6 +355,49 @@ Host: localhost:8080
 
 All distributions support these fields:
 
+### Latency Profiles and Tuning
+
+Use these profiles to shape response timing. The simulator samples a latency per request and sleeps for that duration. For distributions that can produce negative samples, values are clamped to 0 ms.
+
+#### Fixed
+
+- **Behavior**: Constant latency for every request.
+- **Parameters**: `value_ms` (integer, >= 0).
+- **Use when**: You want deterministic timing or to validate client-side timeouts.
+- **Tuning tip**: Set to your target steady-state latency (for example, 80-120 ms).
+
+#### Normal (Gaussian)
+
+- **Behavior**: Bell curve centered on `mean_ms` with symmetric variation.
+- **Parameters**: `mean_ms` (integer, > 0), `std_dev_ms` (integer, >= 0).
+- **Use when**: Latency clusters around a typical value with moderate jitter.
+- **Tuning tips**:
+  - About 68% of samples fall within 1 standard deviation and 95% within 2.
+  - Keep `std_dev_ms` smaller than `mean_ms` to avoid frequent clamping to 0.
+
+#### Exponential
+
+- **Behavior**: Many fast responses with a long tail of slower ones.
+- **Parameters**: `mean_ms` (integer, > 0).
+- **Use when**: You want realistic tail latency or occasional spikes.
+- **Tuning tips**:
+  - Approximate percentiles: p50 ~ `mean_ms * 0.69`, p95 ~ `mean_ms * 3`, p99 ~ `mean_ms * 4.6`.
+  - Avoid very small `mean_ms` values (< 10) if you expect meaningful tail latency.
+
+#### Uniform
+
+- **Behavior**: Flat distribution between `min_ms` and `max_ms`.
+- **Parameters**: `min_ms` (integer, >= 0), `max_ms` (integer, >= min_ms).
+- **Use when**: You want bounded jitter without a central peak.
+- **Tuning tip**: Set `min_ms` to your baseline latency and `max_ms` to your worst-case bound.
+
+#### Choosing a Profile
+
+- **Deterministic SLO checks**: Fixed
+- **Stable services with jitter**: Normal
+- **Tail-latency modeling**: Exponential
+- **Hard bounds**: Uniform
+
 #### Fixed
 
 ```json
