@@ -59,10 +59,12 @@ mod tests {
 				error_profile: ErrorProfile::default(),
 				rate_limit: None,
 				bandwidth_cap: None,
-				behavior_windows: vec![],
 				loaded_at: None,
 				rate_limiter: None,
 			}],
+			endpoint_groups: vec![],
+			behavior_windows: vec![],
+			burst_events: vec![],
 			workflows: vec![],
 		}
 	}

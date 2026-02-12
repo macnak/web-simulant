@@ -191,6 +191,29 @@
         cursor: pointer;
       }
 
+      .btn.tiny {
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 8px;
+      }
+
+      select.btn {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        padding-right: 30px;
+        background-image:
+          linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.6) 50%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.6) 50%, transparent 50%);
+        background-position:
+          calc(100% - 18px) 50%,
+          calc(100% - 12px) 50%;
+        background-size:
+          6px 6px,
+          6px 6px;
+        background-repeat: no-repeat;
+      }
+
       .btn.primary {
         background: linear-gradient(
           120deg,
@@ -221,6 +244,141 @@
         font-size: 13px;
       }
 
+      .form-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .form-field.hidden {
+        display: none;
+      }
+
+      .form-field label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--muted);
+      }
+
+      .form-field label.required::after {
+        content: " *";
+        color: var(--accent);
+      }
+
+      .field-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
+      }
+
+      .behavior-status {
+        margin: 12px 0 18px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(122, 215, 240, 0.08);
+        border: 1px solid rgba(122, 215, 240, 0.3);
+        color: var(--accent-2);
+        font-size: 13px;
+      }
+
+      .behavior-status.error {
+        background: rgba(255, 107, 107, 0.12);
+        border-color: rgba(255, 107, 107, 0.4);
+        color: #ffd6d6;
+      }
+
+      .form-field input,
+      .form-field select,
+      .form-field textarea {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text);
+        background: rgba(8, 10, 14, 0.65);
+        padding: 10px 12px;
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 13px;
+      }
+
+      .form-field input::placeholder,
+      .form-field textarea::placeholder {
+        color: rgba(246, 243, 238, 0.7);
+      }
+
+      .form-field select option {
+        background: var(--bg-3);
+        color: var(--text);
+      }
+
+      .form-field input:focus,
+      .form-field select:focus,
+      .form-field textarea:focus {
+        outline: none;
+        border-color: rgba(122, 215, 240, 0.7);
+        box-shadow: 0 0 0 2px rgba(122, 215, 240, 0.2);
+      }
+
+      .form-field textarea {
+        min-height: 92px;
+        resize: vertical;
+      }
+
+      .field-hint {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.55);
+      }
+
+      .field-error {
+        display: none;
+        font-size: 12px;
+        color: var(--danger);
+      }
+
+      .field-error.active {
+        display: block;
+      }
+
+      .field-group {
+        display: none;
+        grid-column: 1 / -1;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .field-group.active {
+        display: block;
+      }
+
+      .toggle-group {
+        display: none;
+        grid-column: 1 / -1;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px dashed rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .toggle-group.active {
+        display: block;
+      }
+
+      .toggle-group .form-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      }
+
+      .field-group .form-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      }
+
       .status-grid {
         display: grid;
         gap: 8px;
@@ -249,6 +407,7 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
+        z-index: 1000;
       }
 
       .modal.active {
@@ -262,6 +421,14 @@
         border: 1px solid var(--border);
         max-width: 560px;
         width: 100%;
+      }
+
+      .modal-card--wide {
+        max-width: 980px;
+      }
+
+      .panel-hidden {
+        display: none;
       }
 
       .fade-in {
@@ -356,6 +523,9 @@
             <button class="btn secondary" data-action="download">
               Download Config
             </button>
+            <button class="btn" data-action="open-behaviors">
+              Edit Behaviors
+            </button>
             <button class="btn ghost" data-action="validate">
               Validate Only
             </button>
@@ -395,6 +565,561 @@
         </div>
       </section>
 
+      <div
+        class="modal editor-modal"
+        data-endpoint-editor
+        aria-label="Endpoint Editor"
+        aria-hidden="true"
+      >
+        <div class="modal-card modal-card--wide">
+          <div class="endpoint-header">
+            <h2 style="margin: 0">Endpoint Editor</h2>
+            <div class="actions">
+              <select id="endpoint-selector" class="btn">
+                <option value="">Select endpoint...</option>
+              </select>
+              <button class="btn" data-action="reset-editor">Reset</button>
+              <button class="btn ghost" data-action="cancel-editor">
+                Cancel
+              </button>
+            </div>
+          </div>
+          <p class="note">
+            Create, update, or delete endpoints. For advanced behavior windows,
+            paste JSON arrays.
+          </p>
+          <p class="field-hint">
+            Fields marked with * are required. Defaults are prefilled when
+            possible.
+          </p>
+          <form id="endpoint-form">
+            <div class="form-grid">
+              <div class="form-field">
+                <label class="required" for="endpoint-id">ID</label>
+                <input
+                  id="endpoint-id"
+                  name="id"
+                  type="text"
+                  placeholder="health"
+                  required
+                />
+                <span class="field-error" data-error-for="endpoint-id"></span>
+              </div>
+              <div class="form-field">
+                <label class="required" for="endpoint-method">Method</label>
+                <select id="endpoint-method" name="method">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>DELETE</option>
+                  <option>PATCH</option>
+                  <option>HEAD</option>
+                  <option>OPTIONS</option>
+                </select>
+              </div>
+              <div class="form-field">
+                <label class="required" for="endpoint-path">Path</label>
+                <input
+                  id="endpoint-path"
+                  name="path"
+                  type="text"
+                  placeholder="/api/health"
+                  required
+                />
+                <span class="field-error" data-error-for="endpoint-path"></span>
+              </div>
+              <div class="form-field">
+                <label for="request-match">Request Match</label>
+                <select id="request-match" name="requestMatch">
+                  <option value="any">any</option>
+                  <option value="exact">exact</option>
+                  <option value="contains">contains</option>
+                  <option value="ignore">ignore</option>
+                </select>
+              </div>
+              <div
+                class="form-field hidden"
+                style="grid-column: 1 / -1"
+                data-request-body
+              >
+                <label for="request-body">Request Body (optional)</label>
+                <textarea
+                  id="request-body"
+                  name="requestBody"
+                  placeholder='{"id": 1}'
+                ></textarea>
+                <span class="field-error" data-error-for="request-body"></span>
+              </div>
+              <div class="form-field">
+                <label class="required" for="latency-distribution"
+                  >Latency Distribution</label
+                >
+                <select id="latency-distribution" name="latencyDistribution">
+                  <option value="fixed">fixed</option>
+                  <option value="normal">normal</option>
+                  <option value="exponential">exponential</option>
+                  <option value="uniform">uniform</option>
+                  <option value="log_normal">log_normal</option>
+                  <option value="mixture">mixture</option>
+                </select>
+              </div>
+              <div class="field-group" data-latency-group="fixed">
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label class="required" for="latency-delay"
+                      >Delay (ms)</label
+                    >
+                    <input
+                      id="latency-delay"
+                      type="number"
+                      step="0.1"
+                      placeholder="50"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="latency-delay"
+                    ></span>
+                    <div class="field-hint">Required for fixed latency.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="field-group" data-latency-group="normal">
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label class="required" for="latency-mean">Mean (ms)</label>
+                    <input
+                      id="latency-mean"
+                      type="number"
+                      step="0.1"
+                      placeholder="100"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="latency-mean"
+                    ></span>
+                    <div class="field-hint">
+                      Required for normal distribution.
+                    </div>
+                  </div>
+                  <div class="form-field">
+                    <label class="required" for="latency-stddev"
+                      >Stddev (ms)</label
+                    >
+                    <input
+                      id="latency-stddev"
+                      type="number"
+                      step="0.1"
+                      placeholder="20"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="latency-stddev"
+                    ></span>
+                    <div class="field-hint">
+                      Required for normal distribution.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="field-group" data-latency-group="log_normal">
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label class="required" for="latency-log-mean"
+                      >Mean (ms)</label
+                    >
+                    <input
+                      id="latency-log-mean"
+                      type="number"
+                      step="0.1"
+                      placeholder="150"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="latency-log-mean"
+                    ></span>
+                    <div class="field-hint">Required for log-normal.</div>
+                  </div>
+                  <div class="form-field">
+                    <label class="required" for="latency-log-stddev"
+                      >Stddev (ms)</label
+                    >
+                    <input
+                      id="latency-log-stddev"
+                      type="number"
+                      step="0.1"
+                      placeholder="60"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="latency-log-stddev"
+                    ></span>
+                    <div class="field-hint">Required for log-normal.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="field-group" data-latency-group="exponential">
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label class="required" for="latency-rate">Rate</label>
+                    <input
+                      id="latency-rate"
+                      type="number"
+                      step="0.001"
+                      placeholder="0.02"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="latency-rate"
+                    ></span>
+                    <div class="field-hint">Required for exponential.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="field-group" data-latency-group="uniform">
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label class="required" for="latency-min">Min (ms)</label>
+                    <input
+                      id="latency-min"
+                      type="number"
+                      step="0.1"
+                      placeholder="50"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="latency-min"
+                    ></span>
+                    <div class="field-hint">Required for uniform.</div>
+                  </div>
+                  <div class="form-field">
+                    <label class="required" for="latency-max">Max (ms)</label>
+                    <input
+                      id="latency-max"
+                      type="number"
+                      step="0.1"
+                      placeholder="150"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="latency-max"
+                    ></span>
+                    <div class="field-hint">Required for uniform.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="field-group" data-latency-group="mixture">
+                <div class="form-grid">
+                  <div class="form-field" style="grid-column: 1 / -1">
+                    <label class="required" for="latency-mixture"
+                      >Mixture Components (JSON)</label
+                    >
+                    <textarea
+                      id="latency-mixture"
+                      placeholder='[{"weight":0.8,"distribution":"fixed","params":{"delay_ms":20}}, {"weight":0.2,"distribution":"log_normal","params":{"mean_ms":250,"stddev_ms":80}}]'
+                    ></textarea>
+                    <span
+                      class="field-error"
+                      data-error-for="latency-mixture"
+                    ></span>
+                    <div class="field-hint">
+                      Required for mixture distribution.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="form-field">
+                <label class="required" for="response-status"
+                  >Response Status</label
+                >
+                <input id="response-status" type="number" placeholder="200" />
+              </div>
+              <div class="form-field" style="grid-column: 1 / -1">
+                <label class="required" for="response-body"
+                  >Response Body</label
+                >
+                <textarea
+                  id="response-body"
+                  placeholder='{"status":"ok"}'
+                ></textarea>
+              </div>
+              <div class="form-field" style="grid-column: 1 / -1">
+                <label>
+                  <input id="error-enabled" type="checkbox" /> Enable error
+                  responses
+                </label>
+                <div class="field-hint">
+                  Reveal error rate, codes, and payload options.
+                </div>
+              </div>
+              <div class="toggle-group" data-toggle-group="error">
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label for="error-rate">Error Rate (0-1)</label>
+                    <input
+                      id="error-rate"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.05"
+                    />
+                  </div>
+                  <div class="form-field">
+                    <label for="error-codes">Error Codes (comma)</label>
+                    <input id="error-codes" type="text" placeholder="500,503" />
+                    <span
+                      class="field-error"
+                      data-error-for="error-codes"
+                    ></span>
+                  </div>
+                  <div class="form-field" style="grid-column: 1 / -1">
+                    <label for="error-body">Error Body</label>
+                    <textarea
+                      id="error-body"
+                      placeholder='{"error":"Service unavailable"}'
+                    ></textarea>
+                  </div>
+                  <div class="form-field">
+                    <label>
+                      <input id="error-in-payload" type="checkbox" /> Error in
+                      payload (HTTP 200)
+                    </label>
+                  </div>
+                  <div class="form-field">
+                    <label>
+                      <input id="corruption-enabled" type="checkbox" /> Enable
+                      payload corruption
+                    </label>
+                  </div>
+                </div>
+                <div class="toggle-group" data-toggle-group="corruption">
+                  <div class="form-grid">
+                    <div class="form-field">
+                      <label for="corruption-rate">Corruption Rate (0-1)</label>
+                      <input
+                        id="corruption-rate"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.2"
+                      />
+                      <span
+                        class="field-error"
+                        data-error-for="corruption-rate"
+                      ></span>
+                    </div>
+                    <div class="form-field">
+                      <label for="corruption-mode">Corruption Mode</label>
+                      <select id="corruption-mode">
+                        <option value="truncate">truncate</option>
+                        <option value="replace">replace</option>
+                      </select>
+                    </div>
+                    <div class="form-field">
+                      <label for="corruption-truncate">Truncate Ratio</label>
+                      <input
+                        id="corruption-truncate"
+                        type="number"
+                        step="0.05"
+                        placeholder="0.4"
+                      />
+                    </div>
+                    <div class="form-field" style="grid-column: 1 / -1">
+                      <label for="corruption-replacement"
+                        >Replacement Body</label
+                      >
+                      <textarea
+                        id="corruption-replacement"
+                        placeholder='{"error":"Malformed response"}'
+                      ></textarea>
+                      <span
+                        class="field-error"
+                        data-error-for="corruption-replacement"
+                      ></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="form-field" style="grid-column: 1 / -1">
+                <label>
+                  <input id="rate-limit-enabled" type="checkbox" /> Enable rate
+                  limiting
+                </label>
+                <div class="field-hint">
+                  Throttle requests per second with optional burst.
+                </div>
+              </div>
+              <div class="toggle-group" data-toggle-group="rate-limit">
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label for="rate-limit">Rate Limit (requests/sec)</label>
+                    <input
+                      id="rate-limit"
+                      type="number"
+                      step="0.1"
+                      placeholder="5"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="rate-limit"
+                    ></span>
+                  </div>
+                  <div class="form-field">
+                    <label for="rate-burst">Burst</label>
+                    <input
+                      id="rate-burst"
+                      type="number"
+                      step="0.1"
+                      placeholder="2"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="rate-burst"
+                    ></span>
+                  </div>
+                </div>
+              </div>
+              <div class="form-field" style="grid-column: 1 / -1">
+                <label>
+                  <input id="bandwidth-enabled" type="checkbox" /> Enable
+                  bandwidth cap
+                </label>
+                <div class="field-hint">Limit response bytes per second.</div>
+              </div>
+              <div class="toggle-group" data-toggle-group="bandwidth">
+                <div class="form-grid">
+                  <div class="form-field">
+                    <label for="bandwidth-cap">Bandwidth (bytes/sec)</label>
+                    <input
+                      id="bandwidth-cap"
+                      type="number"
+                      step="1"
+                      placeholder="10240"
+                    />
+                    <span
+                      class="field-error"
+                      data-error-for="bandwidth-cap"
+                    ></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="keyline"></div>
+            <div class="actions">
+              <button
+                class="btn primary"
+                type="button"
+                data-action="create-endpoint"
+              >
+                Create
+              </button>
+              <button
+                class="btn secondary"
+                type="button"
+                data-action="update-endpoint"
+                disabled
+              >
+                Update
+              </button>
+              <button
+                class="btn ghost"
+                type="button"
+                data-action="delete-endpoint"
+                disabled
+              >
+                Delete
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div
+        class="modal behavior-modal"
+        data-behavior-editor
+        aria-label="Behavior Editor"
+        aria-hidden="true"
+      >
+        <div class="modal-card modal-card--wide">
+          <div class="endpoint-header">
+            <h2 style="margin: 0">Behavior Editor</h2>
+            <div class="actions">
+              <button class="btn ghost" data-action="cancel-behaviors">
+                Cancel
+              </button>
+            </div>
+          </div>
+          <p class="note">
+            Manage endpoint groups, behavior windows, and burst events. Paste
+            JSON arrays.
+          </p>
+          <div class="behavior-status" data-behavior-status>
+            No validation run yet.
+          </div>
+          <div class="form-grid">
+            <div class="form-field" style="grid-column: 1 / -1">
+              <label for="behavior-groups">Endpoint Groups (JSON array)</label>
+              <textarea
+                id="behavior-groups"
+                placeholder='[{"id":"core-apis","endpoint_ids":["get-users","create-user"]}]'
+              ></textarea>
+              <span class="field-error" data-error-for="behavior-groups"></span>
+              <div class="field-actions">
+                <button class="btn tiny" data-action="groups-template">
+                  Insert template
+                </button>
+                <button class="btn tiny" data-action="groups-format">
+                  Format JSON
+                </button>
+              </div>
+            </div>
+            <div class="form-field" style="grid-column: 1 / -1">
+              <label for="behavior-windows-top"
+                >Behavior Windows (JSON array)</label
+              >
+              <textarea
+                id="behavior-windows-top"
+                placeholder='[{"id":"peak-load","scope":{"group_id":"core-apis"},"schedule":{"mode":"fixed","start_offset_ms":30000,"duration_ms":30000},"error_mix":"override","latency_override":{"distribution":"uniform","params":{"min_ms":500,"max_ms":12000}},"error_profile_override":{"rate":0.1,"codes":[503],"body":"{\"error\":\"Degraded\"}"}}]'
+              ></textarea>
+              <span
+                class="field-error"
+                data-error-for="behavior-windows-top"
+              ></span>
+              <div class="field-actions">
+                <button class="btn tiny" data-action="windows-template">
+                  Insert template
+                </button>
+                <button class="btn tiny" data-action="windows-format">
+                  Format JSON
+                </button>
+              </div>
+            </div>
+            <div class="form-field" style="grid-column: 1 / -1">
+              <label for="burst-events">Burst Events (JSON array)</label>
+              <textarea
+                id="burst-events"
+                placeholder='[{"id":"spike-1","scope":{"endpoint_id":"create-user"},"frequency":{"every_ms":300000,"jitter_ms":60000},"duration_ms":20000,"latency_spike":{"distribution":"log_normal","params":{"mean_ms":800,"stddev_ms":300}},"error_spike":{"error_mix":"additive","error_profile":{"rate":0.2,"codes":[502,503],"body":"{\"error\":\"Transient spike\"}"}}}]'
+              ></textarea>
+              <span class="field-error" data-error-for="burst-events"></span>
+              <div class="field-actions">
+                <button class="btn tiny" data-action="bursts-template">
+                  Insert template
+                </button>
+                <button class="btn tiny" data-action="bursts-format">
+                  Format JSON
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="keyline"></div>
+          <div class="actions">
+            <button class="btn" data-action="validate-behaviors">
+              Validate Behaviors
+            </button>
+            <button class="btn primary" data-action="apply-behaviors">
+              Apply Behaviors
+            </button>
+          </div>
+        </div>
+      </div>
+
       <section
         class="card"
         aria-label="Active Endpoints"
@@ -402,7 +1127,12 @@
       >
         <div class="endpoint-header">
           <h2 style="margin: 0">Active Endpoints</h2>
-          <button class="btn" data-action="refresh">Refresh</button>
+          <div class="actions">
+            <button class="btn primary" data-action="open-editor">
+              Add new
+            </button>
+            <button class="btn" data-action="refresh">Refresh</button>
+          </div>
         </div>
         <p class="note">Endpoints appear after a configuration is loaded.</p>
         <div class="endpoint-list" data-endpoint-list>
@@ -414,7 +1144,8 @@
             <p class="note">Latency: normal (mean: 50ms, stddev: 10ms)</p>
             <p class="note">Errors: 0.1% -> [500]</p>
             <div class="actions">
-              <button class="btn ghost" disabled>Expand</button>
+              <button class="btn ghost" disabled>Edit</button>
+              <button class="btn ghost" disabled>Delete</button>
               <button class="btn" disabled>Copy curl</button>
             </div>
           </div>
@@ -456,9 +1187,69 @@
         modalTitle: document.querySelector("[data-modal-title]"),
         modalBody: document.querySelector("[data-modal-body]"),
         configInput: document.getElementById("config-input"),
+        endpointForm: document.getElementById("endpoint-form"),
+        endpointId: document.getElementById("endpoint-id"),
+        endpointMethod: document.getElementById("endpoint-method"),
+        endpointPath: document.getElementById("endpoint-path"),
+        requestMatch: document.getElementById("request-match"),
+        requestBodyField: document.querySelector("[data-request-body]"),
+        requestBody: document.getElementById("request-body"),
+        latencyDistribution: document.getElementById("latency-distribution"),
+        latencyDelay: document.getElementById("latency-delay"),
+        latencyMean: document.getElementById("latency-mean"),
+        latencyStddev: document.getElementById("latency-stddev"),
+        latencyLogMean: document.getElementById("latency-log-mean"),
+        latencyLogStddev: document.getElementById("latency-log-stddev"),
+        latencyRate: document.getElementById("latency-rate"),
+        latencyMin: document.getElementById("latency-min"),
+        latencyMax: document.getElementById("latency-max"),
+        latencyMixture: document.getElementById("latency-mixture"),
+        responseStatus: document.getElementById("response-status"),
+        responseBody: document.getElementById("response-body"),
+        errorEnabled: document.getElementById("error-enabled"),
+        errorRate: document.getElementById("error-rate"),
+        errorCodes: document.getElementById("error-codes"),
+        errorBody: document.getElementById("error-body"),
+        errorInPayload: document.getElementById("error-in-payload"),
+        corruptionEnabled: document.getElementById("corruption-enabled"),
+        corruptionRate: document.getElementById("corruption-rate"),
+        corruptionMode: document.getElementById("corruption-mode"),
+        corruptionTruncate: document.getElementById("corruption-truncate"),
+        corruptionReplacement: document.getElementById(
+          "corruption-replacement",
+        ),
+        rateLimitEnabled: document.getElementById("rate-limit-enabled"),
+        rateLimit: document.getElementById("rate-limit"),
+        rateBurst: document.getElementById("rate-burst"),
+        bandwidthEnabled: document.getElementById("bandwidth-enabled"),
+        bandwidthCap: document.getElementById("bandwidth-cap"),
+        latencyGroups: document.querySelectorAll("[data-latency-group]"),
+        endpointSelector: document.getElementById("endpoint-selector"),
+        updateButton: document.querySelector('[data-action="update-endpoint"]'),
+        deleteButton: document.querySelector('[data-action="delete-endpoint"]'),
+        errorFields: document.querySelectorAll("[data-error-for]"),
+        errorGroup: document.querySelector('[data-toggle-group="error"]'),
+        corruptionGroup: document.querySelector(
+          '[data-toggle-group="corruption"]',
+        ),
+        rateLimitGroup: document.querySelector(
+          '[data-toggle-group="rate-limit"]',
+        ),
+        bandwidthGroup: document.querySelector(
+          '[data-toggle-group="bandwidth"]',
+        ),
+        endpointEditor: document.querySelector("[data-endpoint-editor]"),
+        behaviorEditor: document.querySelector("[data-behavior-editor]"),
+        behaviorGroups: document.getElementById("behavior-groups"),
+        behaviorWindowsInput: document.getElementById("behavior-windows-top"),
+        burstEventsInput: document.getElementById("burst-events"),
+        behaviorStatus: document.querySelector("[data-behavior-status]"),
       };
 
       let fileMode = "upload";
+      let editingEndpointId = null;
+      let currentEndpoints = [];
+      let behaviorConfig = null;
 
       function setBanner(show) {
         if (show) {
@@ -522,7 +1313,8 @@
             return;
           }
           const config = await response.json();
-          ui.configName.textContent = config.metadata?.name || "Loaded config";
+          const metadata = config.metadata || {};
+          ui.configName.textContent = metadata.name || "Loaded config";
           ui.configLoaded.textContent = new Date().toISOString();
         } catch (error) {
           ui.configLoaded.textContent = "--";
@@ -532,7 +1324,9 @@
       async function loadEndpoints() {
         try {
           const { data } = await fetchJson("/api/endpoints");
-          renderEndpoints(data.endpoints || []);
+          currentEndpoints = data.endpoints || [];
+          renderEndpoints(currentEndpoints);
+          refreshEndpointSelector(currentEndpoints);
           ui.configCount.textContent = data.endpoints_count || 0;
         } catch (error) {
           showModal("Endpoints Error", "Failed to load endpoints list.");
@@ -558,12 +1352,23 @@
           const header = node.querySelector("h3");
           const pill = node.querySelector(".pill");
           const notes = node.querySelectorAll(".note");
-          const copyButton = node.querySelector(".actions .btn:last-child");
+          const [editButton, deleteButton, copyButton] =
+            node.querySelectorAll(".actions .btn");
 
           header.textContent = `ID: ${endpoint.id}`;
           pill.textContent = `${endpoint.method} ${endpoint.path}`;
           notes[0].textContent = `Latency: ${endpoint.latency.distribution} (${formatLatency(endpoint.latency.params)})`;
           notes[1].textContent = `Errors: ${(endpoint.error_rate * 100).toFixed(2)}% -> [${endpoint.response_status}]`;
+
+          editButton.disabled = false;
+          editButton.textContent = "Edit";
+          editButton.addEventListener("click", () => editEndpoint(endpoint.id));
+
+          deleteButton.disabled = false;
+          deleteButton.textContent = "Delete";
+          deleteButton.addEventListener("click", () =>
+            deleteEndpoint(endpoint.id),
+          );
 
           copyButton.disabled = false;
           copyButton.textContent = "Copy curl";
@@ -586,7 +1391,21 @@
         if (params.min_ms !== undefined) {
           return `min: ${params.min_ms}ms, max: ${params.max_ms}ms`;
         }
+        if (params.components !== undefined) {
+          return `components: ${params.components.length}`;
+        }
         return "n/a";
+      }
+
+      function refreshEndpointSelector(endpoints) {
+        ui.endpointSelector.innerHTML =
+          '<option value="">Select endpoint...</option>';
+        endpoints.forEach((endpoint) => {
+          const option = document.createElement("option");
+          option.value = endpoint.id;
+          option.textContent = `${endpoint.id} (${endpoint.method} ${endpoint.path})`;
+          ui.endpointSelector.appendChild(option);
+        });
       }
 
       function copyCurl(endpoint) {
@@ -594,6 +1413,958 @@
         navigator.clipboard.writeText(command).then(() => {
           showModal("Copied", `<p>${command}</p>`);
         });
+      }
+
+      function setLatencyGroup(distribution) {
+        ui.latencyGroups.forEach((group) => {
+          if (group.dataset.latencyGroup === distribution) {
+            group.classList.add("active");
+          } else {
+            group.classList.remove("active");
+          }
+        });
+
+        setRequiredLatencyFields(distribution);
+      }
+
+      function setGroupActive(group, enabled) {
+        if (!group) {
+          return;
+        }
+        if (enabled) {
+          group.classList.add("active");
+        } else {
+          group.classList.remove("active");
+        }
+      }
+
+      function setFieldHidden(field, hidden) {
+        if (!field) {
+          return;
+        }
+        if (hidden) {
+          field.classList.add("hidden");
+        } else {
+          field.classList.remove("hidden");
+        }
+      }
+
+      function updateRequestBodyVisibility() {
+        const match = ui.requestMatch.value;
+        const show = match === "exact" || match === "contains";
+        setFieldHidden(ui.requestBodyField, !show);
+        if (!show) {
+          ui.requestBody.value = "";
+          setFieldError("request-body", "");
+        }
+      }
+
+      function updateErrorVisibility() {
+        const enabled = ui.errorEnabled.checked;
+        setGroupActive(ui.errorGroup, enabled);
+        if (!enabled) {
+          ui.corruptionEnabled.checked = false;
+          setGroupActive(ui.corruptionGroup, false);
+        }
+      }
+
+      function updateCorruptionVisibility() {
+        setGroupActive(ui.corruptionGroup, ui.corruptionEnabled.checked);
+      }
+
+      function updateRateLimitVisibility() {
+        setGroupActive(ui.rateLimitGroup, ui.rateLimitEnabled.checked);
+      }
+
+      function updateBandwidthVisibility() {
+        setGroupActive(ui.bandwidthGroup, ui.bandwidthEnabled.checked);
+      }
+
+      function openEditor(mode) {
+        ui.endpointEditor.classList.add("active");
+        ui.endpointEditor.setAttribute("aria-hidden", "false");
+        if (mode === "create") {
+          resetEditor();
+        }
+      }
+
+      function closeEditor() {
+        ui.endpointEditor.classList.remove("active");
+        ui.endpointEditor.setAttribute("aria-hidden", "true");
+        resetEditor();
+      }
+
+      async function openBehaviorEditor() {
+        clearFieldErrors();
+        try {
+          const response = await fetch("/api/config/export?format=json");
+          if (!response.ok) {
+            showModal("Behavior Editor", "Load a configuration first.");
+            return;
+          }
+          const config = await response.json();
+          behaviorConfig = config;
+          ui.behaviorGroups.value = JSON.stringify(
+            config.endpoint_groups || [],
+            null,
+            2,
+          );
+          ui.behaviorWindowsInput.value = JSON.stringify(
+            config.behavior_windows || [],
+            null,
+            2,
+          );
+          ui.burstEventsInput.value = JSON.stringify(
+            config.burst_events || [],
+            null,
+            2,
+          );
+          ui.behaviorEditor.classList.add("active");
+          ui.behaviorEditor.setAttribute("aria-hidden", "false");
+        } catch (error) {
+          showModal("Behavior Editor", "Unable to load configuration.");
+        }
+      }
+
+      function closeBehaviorEditor() {
+        ui.behaviorEditor.classList.remove("active");
+        ui.behaviorEditor.setAttribute("aria-hidden", "true");
+        behaviorConfig = null;
+      }
+
+      function insertBehaviorTemplate(target) {
+        if (target === "groups") {
+          ui.behaviorGroups.value = JSON.stringify(
+            [{ id: "core-apis", endpoint_ids: ["get-users", "create-user"] }],
+            null,
+            2,
+          );
+          return;
+        }
+        if (target === "windows") {
+          ui.behaviorWindowsInput.value = JSON.stringify(
+            [
+              {
+                id: "peak-load",
+                scope: { group_id: "core-apis" },
+                schedule: {
+                  mode: "fixed",
+                  start_offset_ms: 30000,
+                  duration_ms: 30000,
+                },
+                error_mix: "override",
+                latency_override: {
+                  distribution: "uniform",
+                  params: { min_ms: 500, max_ms: 12000 },
+                },
+                error_profile_override: {
+                  rate: 0.1,
+                  codes: [503],
+                  body: '{"error":"Degraded"}',
+                },
+              },
+            ],
+            null,
+            2,
+          );
+          return;
+        }
+        if (target === "bursts") {
+          ui.burstEventsInput.value = JSON.stringify(
+            [
+              {
+                id: "spike-1",
+                scope: { endpoint_id: "create-user" },
+                frequency: { every_ms: 300000, jitter_ms: 60000 },
+                duration_ms: 20000,
+                latency_spike: {
+                  distribution: "log_normal",
+                  params: { mean_ms: 800, stddev_ms: 300 },
+                },
+                error_spike: {
+                  error_mix: "additive",
+                  error_profile: {
+                    rate: 0.2,
+                    codes: [502, 503],
+                    body: '{"error":"Transient spike"}',
+                  },
+                },
+              },
+            ],
+            null,
+            2,
+          );
+        }
+      }
+
+      function formatJsonField(value, fieldId) {
+        const parsed = parseJson(value);
+        if (parsed === null) {
+          setFieldError(fieldId, "Invalid JSON.");
+          return null;
+        }
+        setFieldError(fieldId, "");
+        return JSON.stringify(parsed || [], null, 2);
+      }
+
+      function setBehaviorStatus(message, isError) {
+        if (!ui.behaviorStatus) {
+          return;
+        }
+        ui.behaviorStatus.textContent = message;
+        if (isError) {
+          ui.behaviorStatus.classList.add("error");
+        } else {
+          ui.behaviorStatus.classList.remove("error");
+        }
+      }
+
+      function validateBehaviorConfig(groups, windows, bursts, endpoints) {
+        const errors = [];
+        const groupIds = new Set();
+        const endpointIds = new Set(
+          (endpoints || []).map((endpoint) => endpoint.id),
+        );
+        const groupEndpoints = new Map();
+        const fixedWindowsByEndpoint = new Map();
+
+        const getScopeKey = (scope) => {
+          if (!scope) {
+            return null;
+          }
+          if (scope.global) {
+            return "global";
+          }
+          if (scope.endpoint_id) {
+            return `endpoint:${scope.endpoint_id}`;
+          }
+          if (scope.group_id) {
+            return `group:${scope.group_id}`;
+          }
+          return null;
+        };
+
+        const getWindowLabel = (entry) => entry.id || `#${entry.index + 1}`;
+
+        (groups || []).forEach((group) => {
+          if (!group || !group.id) {
+            errors.push("Group id is required.");
+            return;
+          }
+          if (groupIds.has(group.id)) {
+            errors.push(`Duplicate group id: ${group.id}.`);
+          }
+          groupIds.add(group.id);
+          if (
+            !Array.isArray(group.endpoint_ids) ||
+            group.endpoint_ids.length === 0
+          ) {
+            errors.push(`Group ${group.id} must include endpoint_ids.`);
+          } else {
+            groupEndpoints.set(group.id, group.endpoint_ids.slice());
+            group.endpoint_ids.forEach((id) => {
+              if (!endpointIds.has(id)) {
+                errors.push(
+                  `Group ${group.id} references missing endpoint ${id}.`,
+                );
+              }
+            });
+          }
+        });
+
+        (windows || []).forEach((window, index) => {
+          if (!window || !window.scope) {
+            errors.push(`Window ${index + 1} missing scope.`);
+            return;
+          }
+          const scope = window.scope || {};
+          const scopeCount =
+            (scope.endpoint_id ? 1 : 0) +
+            (scope.group_id ? 1 : 0) +
+            (scope.global ? 1 : 0);
+          if (scopeCount !== 1) {
+            errors.push(`Window ${index + 1} must define exactly one scope.`);
+          }
+          if (scope.group_id && !groupIds.has(scope.group_id)) {
+            errors.push(
+              `Window ${index + 1} references missing group ${scope.group_id}.`,
+            );
+          }
+          if (scope.endpoint_id && !endpointIds.has(scope.endpoint_id)) {
+            errors.push(
+              `Window ${index + 1} references missing endpoint ${scope.endpoint_id}.`,
+            );
+          }
+
+          const schedule = window.schedule || {};
+          if (!schedule.mode) {
+            errors.push(`Window ${index + 1} schedule.mode is required.`);
+          }
+          if (schedule.duration_ms === undefined || schedule.duration_ms <= 0) {
+            errors.push(`Window ${index + 1} duration_ms must be > 0.`);
+          }
+          if (schedule.mode === "fixed") {
+            if (
+              schedule.start_offset_ms === undefined ||
+              schedule.start_offset_ms < 0
+            ) {
+              errors.push(`Window ${index + 1} start_offset_ms must be >= 0.`);
+            }
+            if (
+              Number.isFinite(schedule.start_offset_ms) &&
+              Number.isFinite(schedule.duration_ms)
+            ) {
+              let targetEndpoints = [];
+              if (scope.global) {
+                targetEndpoints = Array.from(endpointIds);
+              } else if (scope.endpoint_id) {
+                targetEndpoints = [scope.endpoint_id];
+              } else if (scope.group_id) {
+                targetEndpoints = groupEndpoints.get(scope.group_id) || [];
+              }
+
+              targetEndpoints.forEach((endpointId) => {
+                const entries = fixedWindowsByEndpoint.get(endpointId) || [];
+                entries.push({
+                  index,
+                  id: window.id,
+                  start: schedule.start_offset_ms,
+                  end: schedule.start_offset_ms + schedule.duration_ms,
+                });
+                fixedWindowsByEndpoint.set(endpointId, entries);
+              });
+            }
+          }
+          if (schedule.mode === "recurring") {
+            if (schedule.every_ms === undefined || schedule.every_ms <= 0) {
+              errors.push(`Window ${index + 1} every_ms must be > 0.`);
+            }
+            if (
+              schedule.every_ms !== undefined &&
+              schedule.duration_ms !== undefined &&
+              schedule.duration_ms > schedule.every_ms
+            ) {
+              errors.push(
+                `Window ${index + 1} duration_ms must be <= every_ms.`,
+              );
+            }
+            if (schedule.jitter_ms !== undefined && schedule.jitter_ms < 0) {
+              errors.push(`Window ${index + 1} jitter_ms must be >= 0.`);
+            }
+          }
+        });
+
+        fixedWindowsByEndpoint.forEach((entries, endpointId) => {
+          entries.sort((a, b) => a.start - b.start);
+          for (let i = 1; i < entries.length; i += 1) {
+            const previous = entries[i - 1];
+            const current = entries[i];
+            if (current.start < previous.end) {
+              errors.push(
+                `Window ${getWindowLabel(previous)} overlaps window ${getWindowLabel(current)} for endpoint ${endpointId}.`,
+              );
+            }
+          }
+        });
+
+        (bursts || []).forEach((burst, index) => {
+          if (!burst || !burst.scope) {
+            errors.push(`Burst ${index + 1} missing scope.`);
+            return;
+          }
+          const scope = burst.scope || {};
+          const scopeCount =
+            (scope.endpoint_id ? 1 : 0) +
+            (scope.group_id ? 1 : 0) +
+            (scope.global ? 1 : 0);
+          if (scopeCount !== 1) {
+            errors.push(`Burst ${index + 1} must define exactly one scope.`);
+          }
+          if (scope.group_id && !groupIds.has(scope.group_id)) {
+            errors.push(
+              `Burst ${index + 1} references missing group ${scope.group_id}.`,
+            );
+          }
+          if (scope.endpoint_id && !endpointIds.has(scope.endpoint_id)) {
+            errors.push(
+              `Burst ${index + 1} references missing endpoint ${scope.endpoint_id}.`,
+            );
+          }
+          if (
+            !burst.frequency ||
+            burst.frequency.every_ms === undefined ||
+            burst.frequency.every_ms <= 0
+          ) {
+            errors.push(`Burst ${index + 1} frequency.every_ms must be > 0.`);
+          }
+          if (burst.duration_ms === undefined || burst.duration_ms <= 0) {
+            errors.push(`Burst ${index + 1} duration_ms must be > 0.`);
+          }
+          if (
+            burst.frequency &&
+            burst.frequency.every_ms !== undefined &&
+            burst.duration_ms !== undefined &&
+            burst.duration_ms > burst.frequency.every_ms
+          ) {
+            errors.push(`Burst ${index + 1} duration_ms must be <= every_ms.`);
+          }
+        });
+
+        return errors;
+      }
+
+      async function applyBehaviorEditor() {
+        if (!behaviorConfig) {
+          showModal("Behavior Editor", "Load a configuration first.");
+          return;
+        }
+
+        clearFieldErrors();
+
+        const groups = parseJson(ui.behaviorGroups.value.trim());
+        if (groups === null) {
+          setFieldError(
+            "behavior-groups",
+            "Endpoint groups must be valid JSON.",
+          );
+          return;
+        }
+
+        const windows = parseJson(ui.behaviorWindowsInput.value.trim());
+        if (windows === null) {
+          setFieldError(
+            "behavior-windows-top",
+            "Behavior windows must be valid JSON.",
+          );
+          return;
+        }
+
+        const bursts = parseJson(ui.burstEventsInput.value.trim());
+        if (bursts === null) {
+          setFieldError("burst-events", "Burst events must be valid JSON.");
+          return;
+        }
+
+        const validationErrors = validateBehaviorConfig(
+          groups || [],
+          windows || [],
+          bursts || [],
+          behaviorConfig.endpoints || [],
+        );
+        if (validationErrors.length > 0) {
+          setBehaviorStatus(
+            `Found ${validationErrors.length} validation issue(s).`,
+            true,
+          );
+          showModal(
+            "Behavior Validation",
+            `<ul>${validationErrors.map((message) => `<li>${message}</li>`).join("")}</ul>`,
+          );
+          return;
+        }
+
+        setBehaviorStatus("Behavior validation passed.", false);
+        behaviorConfig.endpoint_groups = groups || [];
+        behaviorConfig.behavior_windows = windows || [];
+        behaviorConfig.burst_events = bursts || [];
+
+        const { response, data } = await fetchJson("/api/config/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(behaviorConfig),
+        });
+
+        if (!response.ok) {
+          showModal("Save Failed", formatErrors(data));
+          return;
+        }
+
+        closeBehaviorEditor();
+        showModal("Saved", `<p>${data.message}</p>`);
+        await loadStatus();
+      }
+
+      function setRequiredLatencyFields(distribution) {
+        const requiredMap = {
+          fixed: [ui.latencyDelay],
+          normal: [ui.latencyMean, ui.latencyStddev],
+          log_normal: [ui.latencyLogMean, ui.latencyLogStddev],
+          exponential: [ui.latencyRate],
+          uniform: [ui.latencyMin, ui.latencyMax],
+          mixture: [ui.latencyMixture],
+        };
+
+        Object.values(requiredMap)
+          .flat()
+          .forEach((field) => {
+            if (field) {
+              field.removeAttribute("required");
+            }
+          });
+
+        (requiredMap[distribution] || []).forEach((field) => {
+          if (field) {
+            field.setAttribute("required", "required");
+          }
+        });
+      }
+
+      function parseNumber(value) {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+
+      function parseRate(value) {
+        const parsed = parseNumber(value);
+        if (parsed === undefined) {
+          return undefined;
+        }
+        if (parsed > 1 && parsed <= 100) {
+          return parsed / 100;
+        }
+        return parsed;
+      }
+
+      function parseJson(value) {
+        if (!value) {
+          return undefined;
+        }
+        try {
+          return JSON.parse(value);
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function parseCodes(value) {
+        if (!value) {
+          return [];
+        }
+        return value
+          .split(",")
+          .map((code) => Number.parseInt(code.trim(), 10))
+          .filter((code) => Number.isFinite(code));
+      }
+
+      function clearFieldErrors() {
+        ui.errorFields.forEach((field) => {
+          field.textContent = "";
+          field.classList.remove("active");
+        });
+      }
+
+      function setFieldError(fieldId, message) {
+        const errorField = document.querySelector(
+          `[data-error-for="${fieldId}"]`,
+        );
+        if (!errorField) {
+          return;
+        }
+        errorField.textContent = message;
+        if (message) {
+          errorField.classList.add("active");
+        } else {
+          errorField.classList.remove("active");
+        }
+      }
+
+      function applyServerErrors(payload) {
+        const errors = payload.errors || [];
+        if (!errors.length) {
+          return false;
+        }
+
+        const mapField = (field) => {
+          if (field.includes("endpoints.id")) return "endpoint-id";
+          if (field.includes("endpoints.path")) return "endpoint-path";
+          if (field.includes("request.body")) return "request-body";
+          if (field.includes("latency.params.delay_ms")) return "latency-delay";
+          if (field.includes("latency.params.mean_ms")) {
+            return ui.latencyDistribution.value === "log_normal" ?
+                "latency-log-mean"
+              : "latency-mean";
+          }
+          if (field.includes("latency.params.stddev_ms")) {
+            return ui.latencyDistribution.value === "log_normal" ?
+                "latency-log-stddev"
+              : "latency-stddev";
+          }
+          if (field.includes("latency.params.rate")) return "latency-rate";
+          if (field.includes("latency.params.min_ms")) return "latency-min";
+          if (field.includes("latency.params.max_ms")) return "latency-max";
+          if (field.includes("latency.params.components"))
+            return "latency-mixture";
+          if (field.includes("error_profile.rate")) return "error-rate";
+          if (field.includes("error_profile.codes")) return "error-codes";
+          if (field.includes("error_profile.payload_corruption.rate"))
+            return "corruption-rate";
+          if (field.includes("error_profile.payload_corruption.replacement"))
+            return "corruption-replacement";
+          if (field.includes("rate_limit.requests_per_second"))
+            return "rate-limit";
+          if (field.includes("rate_limit.burst")) return "rate-burst";
+          if (field.includes("bandwidth_cap.bytes_per_second"))
+            return "bandwidth-cap";
+          return null;
+        };
+
+        errors.forEach((error) => {
+          const fieldId = mapField(error.field || "");
+          if (fieldId) {
+            setFieldError(fieldId, error.error || "Invalid value");
+          }
+        });
+
+        return true;
+      }
+
+      function buildEndpointPayload() {
+        clearFieldErrors();
+
+        if (!ui.endpointId.value.trim()) {
+          setFieldError("endpoint-id", "Endpoint id is required.");
+        }
+        if (!ui.endpointPath.value.trim()) {
+          setFieldError(
+            "endpoint-path",
+            "Path is required and must start with '/'.",
+          );
+        }
+
+        if (
+          ui.endpointId.value.trim() === "" ||
+          ui.endpointPath.value.trim() === ""
+        ) {
+          throw new Error("Required fields are missing.");
+        }
+
+        const distribution = ui.latencyDistribution.value;
+        const latencyParams = {};
+
+        if (distribution === "fixed") {
+          latencyParams.delay_ms = parseNumber(ui.latencyDelay.value);
+        } else if (distribution === "normal") {
+          latencyParams.mean_ms = parseNumber(ui.latencyMean.value);
+          latencyParams.stddev_ms = parseNumber(ui.latencyStddev.value);
+        } else if (distribution === "log_normal") {
+          latencyParams.mean_ms = parseNumber(ui.latencyLogMean.value);
+          latencyParams.stddev_ms = parseNumber(ui.latencyLogStddev.value);
+        } else if (distribution === "exponential") {
+          latencyParams.rate = parseNumber(ui.latencyRate.value);
+        } else if (distribution === "uniform") {
+          latencyParams.min_ms = parseNumber(ui.latencyMin.value);
+          latencyParams.max_ms = parseNumber(ui.latencyMax.value);
+        } else if (distribution === "mixture") {
+          const components = parseJson(ui.latencyMixture.value);
+          if (components === null) {
+            setFieldError(
+              "latency-mixture",
+              "Mixture components must be valid JSON.",
+            );
+            throw new Error("Invalid JSON in mixture components.");
+          }
+          latencyParams.components = components || [];
+        }
+
+        const requestMatch = ui.requestMatch.value;
+        const requestBody = ui.requestBody.value.trim();
+        if (
+          (requestMatch === "exact" || requestMatch === "contains") &&
+          !requestBody
+        ) {
+          setFieldError(
+            "request-body",
+            "Request body is required for exact/contains match.",
+          );
+          throw new Error("Request body is required for selected match type.");
+        }
+        const request =
+          requestMatch === "any" && !requestBody ?
+            undefined
+          : {
+              body_match: requestMatch,
+              body: requestBody || undefined,
+            };
+
+        const parsedErrorRate = parseRate(ui.errorRate.value);
+        const errorRate = parsedErrorRate === undefined ? 0.0 : parsedErrorRate;
+        const errorProfile = {
+          rate: 0.0,
+          codes: [],
+          body: "",
+          error_in_payload: false,
+        };
+
+        if (ui.errorEnabled.checked) {
+          errorProfile.rate = errorRate;
+          errorProfile.codes = parseCodes(ui.errorCodes.value);
+          errorProfile.body = ui.errorBody.value.trim();
+          errorProfile.error_in_payload = ui.errorInPayload.checked;
+
+          if (ui.corruptionEnabled.checked) {
+            const parsedCorruptionRate = parseRate(ui.corruptionRate.value);
+            const corruptionRate =
+              parsedCorruptionRate === undefined ? 0.0 : parsedCorruptionRate;
+            errorProfile.payload_corruption = {
+              rate: corruptionRate,
+              mode: ui.corruptionMode.value,
+              truncate_ratio: parseNumber(ui.corruptionTruncate.value),
+              replacement: ui.corruptionReplacement.value.trim() || undefined,
+            };
+          }
+        }
+
+        let rateLimit;
+        if (ui.rateLimitEnabled.checked) {
+          const rateLimitValue = parseNumber(ui.rateLimit.value);
+          const burst = parseNumber(ui.rateBurst.value);
+          if (!rateLimitValue) {
+            setFieldError("rate-limit", "Rate limit is required.");
+            throw new Error("Rate limit is required.");
+          }
+          rateLimit = { requests_per_second: rateLimitValue, burst };
+        }
+
+        let bandwidthCap;
+        if (ui.bandwidthEnabled.checked) {
+          const bandwidthValue = parseNumber(ui.bandwidthCap.value);
+          if (!bandwidthValue) {
+            setFieldError("bandwidth-cap", "Bandwidth cap is required.");
+            throw new Error("Bandwidth cap is required.");
+          }
+          bandwidthCap = { bytes_per_second: bandwidthValue };
+        }
+
+        return {
+          id: ui.endpointId.value.trim(),
+          method: ui.endpointMethod.value,
+          path: ui.endpointPath.value.trim(),
+          request,
+          latency: {
+            distribution,
+            params: latencyParams,
+          },
+          response: {
+            status: Number.parseInt(ui.responseStatus.value || "200", 10),
+            headers: { "Content-Type": "application/json" },
+            body: ui.responseBody.value.trim() || "{}",
+          },
+          error_profile: errorProfile,
+          rate_limit: rateLimit,
+          bandwidth_cap: bandwidthCap,
+        };
+      }
+
+      function fillEndpointForm(endpoint) {
+        setEditingState(endpoint.id || null);
+        ui.endpointId.value = endpoint.id || "";
+        ui.endpointMethod.value = endpoint.method || "GET";
+        ui.endpointPath.value = endpoint.path || "";
+
+        if (endpoint.request) {
+          ui.requestMatch.value = endpoint.request.body_match || "any";
+          ui.requestBody.value = endpoint.request.body || "";
+        } else {
+          ui.requestMatch.value = "any";
+          ui.requestBody.value = "";
+        }
+        updateRequestBodyVisibility();
+
+        const latency = endpoint.latency || {};
+        const latencyParams = latency.params || {};
+        ui.latencyDistribution.value = latency.distribution || "fixed";
+        setLatencyGroup(ui.latencyDistribution.value);
+
+        ui.latencyDelay.value = latencyParams.delay_ms ?? "";
+        ui.latencyMean.value = latencyParams.mean_ms ?? "";
+        ui.latencyStddev.value = latencyParams.stddev_ms ?? "";
+        ui.latencyLogMean.value = latencyParams.mean_ms ?? "";
+        ui.latencyLogStddev.value = latencyParams.stddev_ms ?? "";
+        ui.latencyRate.value = latencyParams.rate ?? "";
+        ui.latencyMin.value = latencyParams.min_ms ?? "";
+        ui.latencyMax.value = latencyParams.max_ms ?? "";
+        ui.latencyMixture.value =
+          latencyParams.components ?
+            JSON.stringify(latencyParams.components, null, 2)
+          : "";
+
+        const response = endpoint.response || {};
+        ui.responseStatus.value = response.status ?? "200";
+        ui.responseBody.value = response.body ?? "{}";
+
+        const errorProfile = endpoint.error_profile || {};
+        const hasErrors =
+          (errorProfile.rate || 0) > 0 ||
+          (errorProfile.codes || []).length > 0 ||
+          (errorProfile.body || "").trim() !== "" ||
+          !!errorProfile.error_in_payload ||
+          !!errorProfile.payload_corruption;
+        ui.errorEnabled.checked = hasErrors;
+        ui.errorRate.value = errorProfile.rate ?? "";
+        ui.errorCodes.value = (errorProfile.codes || []).join(",");
+        ui.errorBody.value = errorProfile.body ?? "";
+        ui.errorInPayload.checked = !!errorProfile.error_in_payload;
+
+        if (errorProfile.payload_corruption) {
+          ui.corruptionEnabled.checked = true;
+          ui.corruptionRate.value = errorProfile.payload_corruption.rate ?? "";
+          ui.corruptionMode.value =
+            errorProfile.payload_corruption.mode || "truncate";
+          ui.corruptionTruncate.value =
+            errorProfile.payload_corruption.truncate_ratio ?? "";
+          ui.corruptionReplacement.value =
+            errorProfile.payload_corruption.replacement || "";
+        } else {
+          ui.corruptionEnabled.checked = false;
+          ui.corruptionRate.value = "";
+          ui.corruptionTruncate.value = "";
+          ui.corruptionReplacement.value = "";
+        }
+
+        const rateLimit = endpoint.rate_limit || {};
+        const bandwidthCap = endpoint.bandwidth_cap || {};
+        ui.rateLimitEnabled.checked =
+          rateLimit.requests_per_second !== undefined;
+        ui.bandwidthEnabled.checked =
+          bandwidthCap.bytes_per_second !== undefined;
+        ui.rateLimit.value = rateLimit.requests_per_second ?? "";
+        ui.rateBurst.value = rateLimit.burst ?? "";
+        ui.bandwidthCap.value = bandwidthCap.bytes_per_second ?? "";
+
+        updateErrorVisibility();
+        updateCorruptionVisibility();
+        updateRateLimitVisibility();
+        updateBandwidthVisibility();
+      }
+
+      function resetEditor() {
+        ui.endpointForm.reset();
+        ui.requestBody.value = "";
+        ui.responseBody.value = "";
+        ui.errorBody.value = "";
+        ui.latencyMixture.value = "";
+        ui.corruptionReplacement.value = "";
+        ui.corruptionEnabled.checked = false;
+        ui.errorEnabled.checked = false;
+        ui.rateLimitEnabled.checked = false;
+        ui.bandwidthEnabled.checked = false;
+        ui.latencyDelay.value = "50";
+        ui.latencyMean.value = "100";
+        ui.latencyStddev.value = "20";
+        ui.latencyLogMean.value = "150";
+        ui.latencyLogStddev.value = "60";
+        ui.latencyRate.value = "0.02";
+        ui.latencyMin.value = "50";
+        ui.latencyMax.value = "150";
+        ui.responseStatus.value = "200";
+        ui.responseBody.value = "{}";
+        ui.errorRate.value = "0";
+        ui.errorCodes.value = "";
+        ui.rateLimit.value = "";
+        ui.rateBurst.value = "";
+        ui.bandwidthCap.value = "";
+        clearFieldErrors();
+        setEditingState(null);
+        setLatencyGroup(ui.latencyDistribution.value);
+        updateRequestBodyVisibility();
+        updateErrorVisibility();
+        updateCorruptionVisibility();
+        updateRateLimitVisibility();
+        updateBandwidthVisibility();
+      }
+
+      function setEditingState(endpointId) {
+        editingEndpointId = endpointId;
+        const isEditing = Boolean(endpointId);
+        ui.updateButton.disabled = !isEditing;
+        ui.deleteButton.disabled = !isEditing;
+        if (isEditing) {
+          ui.endpointSelector.value = endpointId;
+        }
+      }
+
+      async function editEndpoint(id) {
+        try {
+          const { response, data } = await fetchJson(`/api/endpoints/${id}`);
+          if (!response.ok) {
+            applyServerErrors(data);
+            showModal("Load Failed", formatErrors(data));
+            return;
+          }
+          openEditor("edit");
+          fillEndpointForm(data.endpoint);
+          showModal("Editor Ready", `<p>Editing ${id}</p>`);
+        } catch (error) {
+          showModal("Load Failed", "Unable to load endpoint details.");
+        }
+      }
+
+      async function deleteEndpoint(id) {
+        if (!confirm(`Delete endpoint ${id}?`)) {
+          return;
+        }
+        const { response, data } = await fetchJson(`/api/endpoints/${id}`, {
+          method: "DELETE",
+        });
+        if (!response.ok) {
+          applyServerErrors(data);
+          showModal("Delete Failed", formatErrors(data));
+          return;
+        }
+        showModal("Deleted", `<p>${id} removed.</p>`);
+        await loadEndpoints();
+        resetEditor();
+      }
+
+      async function saveEndpoint(mode) {
+        let payload;
+        try {
+          payload = buildEndpointPayload();
+        } catch (error) {
+          showModal("Validation Error", `<p>${error.message}</p>`);
+          return;
+        }
+
+        if (mode === "create") {
+          const conflict = currentEndpoints.find(
+            (endpoint) =>
+              endpoint.method === payload.method &&
+              endpoint.path === payload.path,
+          );
+          if (conflict) {
+            setFieldError(
+              "endpoint-path",
+              "An endpoint with this method and path already exists.",
+            );
+            showModal(
+              "Duplicate Endpoint",
+              "A matching method and path already exists.",
+            );
+            return;
+          }
+        }
+
+        const method = mode === "create" ? "POST" : "PUT";
+        const path =
+          mode === "create" ? "/api/endpoints" : `/api/endpoints/${payload.id}`;
+        const { response, data } = await fetchJson(path, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          applyServerErrors(data);
+          showModal("Save Failed", formatErrors(data));
+          return;
+        }
+
+        showModal("Saved", `<p>${data.message}</p>`);
+        closeEditor();
+        await loadEndpoints();
+        if (mode === "create") {
+          setEditingState(payload.id);
+        }
       }
 
       async function sendConfig(action, file) {
@@ -692,6 +2463,105 @@
           if (action === "close-modal") {
             hideModal();
           }
+          if (action === "reset-editor") {
+            resetEditor();
+          }
+          if (action === "open-editor") {
+            openEditor("create");
+          }
+          if (action === "open-behaviors") {
+            openBehaviorEditor();
+          }
+          if (action === "apply-behaviors") {
+            applyBehaviorEditor();
+          }
+          if (action === "validate-behaviors") {
+            if (!behaviorConfig) {
+              showModal("Behavior Editor", "Load a configuration first.");
+              return;
+            }
+            const groups = parseJson(ui.behaviorGroups.value.trim());
+            const windows = parseJson(ui.behaviorWindowsInput.value.trim());
+            const bursts = parseJson(ui.burstEventsInput.value.trim());
+            if (groups === null || windows === null || bursts === null) {
+              setBehaviorStatus("Fix JSON errors before validating.", true);
+              return;
+            }
+            const issues = validateBehaviorConfig(
+              groups || [],
+              windows || [],
+              bursts || [],
+              behaviorConfig.endpoints || [],
+            );
+            if (issues.length === 0) {
+              setBehaviorStatus("Behavior validation passed.", false);
+            } else {
+              setBehaviorStatus(
+                `Found ${issues.length} validation issue(s).`,
+                true,
+              );
+            }
+          }
+          if (action === "groups-template") {
+            insertBehaviorTemplate("groups");
+          }
+          if (action === "groups-format") {
+            const formatted = formatJsonField(
+              ui.behaviorGroups.value.trim(),
+              "behavior-groups",
+            );
+            if (formatted !== null) {
+              ui.behaviorGroups.value = formatted;
+            }
+          }
+          if (action === "windows-template") {
+            insertBehaviorTemplate("windows");
+          }
+          if (action === "windows-format") {
+            const formatted = formatJsonField(
+              ui.behaviorWindowsInput.value.trim(),
+              "behavior-windows-top",
+            );
+            if (formatted !== null) {
+              ui.behaviorWindowsInput.value = formatted;
+            }
+          }
+          if (action === "bursts-template") {
+            insertBehaviorTemplate("bursts");
+          }
+          if (action === "bursts-format") {
+            const formatted = formatJsonField(
+              ui.burstEventsInput.value.trim(),
+              "burst-events",
+            );
+            if (formatted !== null) {
+              ui.burstEventsInput.value = formatted;
+            }
+          }
+          if (action === "cancel-editor") {
+            closeEditor();
+          }
+          if (action === "cancel-behaviors") {
+            closeBehaviorEditor();
+          }
+          if (action === "create-endpoint") {
+            saveEndpoint("create");
+          }
+          if (action === "update-endpoint") {
+            if (!editingEndpointId) {
+              showModal("Update Disabled", "Load an endpoint before updating.");
+              return;
+            }
+            saveEndpoint("update");
+          }
+          if (action === "delete-endpoint") {
+            const id = ui.endpointId.value.trim();
+            if (!id) {
+              showModal("Delete Failed", "Endpoint id is required.");
+              return;
+            }
+            deleteEndpoint(id);
+          }
         });
       });
 
@@ -701,6 +2571,40 @@
           sendConfig(fileMode, file);
         }
       });
+
+      ui.latencyDistribution.addEventListener("change", () => {
+        setLatencyGroup(ui.latencyDistribution.value);
+      });
+
+      ui.requestMatch.addEventListener("change", () => {
+        updateRequestBodyVisibility();
+      });
+
+      ui.errorEnabled.addEventListener("change", () => {
+        updateErrorVisibility();
+      });
+
+      ui.corruptionEnabled.addEventListener("change", () => {
+        updateCorruptionVisibility();
+      });
+
+      ui.rateLimitEnabled.addEventListener("change", () => {
+        updateRateLimitVisibility();
+      });
+
+      ui.bandwidthEnabled.addEventListener("change", () => {
+        updateBandwidthVisibility();
+      });
+
+      ui.endpointSelector.addEventListener("change", () => {
+        const id = ui.endpointSelector.value;
+        if (!id) {
+          return;
+        }
+        editEndpoint(id);
+      });
+
+      closeEditor();
 
       loadStatus();
     </script>

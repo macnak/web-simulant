@@ -61,16 +61,15 @@ Upload and immediately apply a new configuration. Supports YAML, JSON, or multip
   "version": "1.0",
   "endpoints": [
     {
+      "id": "get-users",
       "method": "GET",
       "path": "/api/users",
-      "latency": { "type": "fixed", "value_ms": 100 },
-      "responses": [
-        {
-          "status": 200,
-          "body": "{\"users\": []}",
-          "error_rate": 0.0
-        }
-      ]
+      "latency": { "distribution": "fixed", "params": { "delay_ms": 100 } },
+      "response": {
+        "status": 200,
+        "body": "{\"users\": []}"
+      },
+      "error_profile": { "rate": 0.0 }
     }
   ]
 }
@@ -81,15 +80,18 @@ Upload and immediately apply a new configuration. Supports YAML, JSON, or multip
 ```yaml
 version: "1.0"
 endpoints:
-  - method: GET
+  - id: get-users
+    method: GET
     path: /api/users
     latency:
-      type: fixed
-      value_ms: 100
-    responses:
-      - status: 200
-        body: '{"users": []}'
-        error_rate: 0.0
+      distribution: fixed
+      params:
+        delay_ms: 100
+    response:
+      status: 200
+      body: '{"users": []}'
+    error_profile:
+      rate: 0.0
 ```
 
 **Response (200 OK) - Success**:
@@ -189,20 +191,29 @@ List all currently active endpoints.
 
 ```json
 {
+  "endpoints_count": 2,
   "endpoints": [
     {
-      "id": "GET-/api/users",
+      "id": "get-users",
       "method": "GET",
       "path": "/api/users",
-      "latency_type": "normal",
-      "error_rate": 0.02
+      "latency": {
+        "distribution": "normal",
+        "params": { "mean_ms": 100, "stddev_ms": 20 }
+      },
+      "error_rate": 0.02,
+      "response_status": 200
     },
     {
-      "id": "POST-/api/users",
+      "id": "create-user",
       "method": "POST",
       "path": "/api/users",
-      "latency_type": "fixed",
-      "error_rate": 0.05
+      "latency": {
+        "distribution": "fixed",
+        "params": { "delay_ms": 50 }
+      },
+      "error_rate": 0.05,
+      "response_status": 201
     }
   ]
 }
@@ -216,27 +227,27 @@ Get details for a specific endpoint.
 
 **Path Parameters**:
 
-- `id`: Endpoint ID in format `METHOD-path` (e.g., `GET-/api/users`)
+- `id`: Endpoint ID (e.g., `get-users`)
 
 **Response (200 OK)**:
 
 ```json
 {
-  "id": "GET-/api/users",
+  "id": "get-users",
   "method": "GET",
   "path": "/api/users",
   "latency": {
-    "type": "normal",
-    "mean_ms": 100,
-    "std_dev_ms": 20
+    "distribution": "normal",
+    "params": { "mean_ms": 100, "stddev_ms": 20 }
   },
-  "responses": [
-    {
-      "status": 200,
-      "body": "{\"users\": []}",
-      "error_rate": 0.02
-    }
-  ]
+  "response": {
+    "status": 200,
+    "body": "{\"users\": []}"
+  },
+  "error_profile": {
+    "rate": 0.02,
+    "codes": [500]
+  }
 }
 ```
 
@@ -331,8 +342,13 @@ Host: localhost:8080
 
 ```typescript
 {
-  version: "1.0",           // Required: config version
-  endpoints: Endpoint[]     // Required: array of endpoint definitions
+  version: "1.0",              // Required: config version
+  metadata?: Metadata,         // Optional: descriptive metadata
+  endpoints: Endpoint[],        // Required: array of endpoint definitions
+  endpoint_groups?: Group[],    // Optional: endpoint group definitions
+  behavior_windows?: Window[],  // Optional: scoped behavior windows
+  burst_events?: BurstEvent[],  // Optional: scoped burst events
+  workflows?: Workflow[]        // Reserved for Phase 2 workflows
 }
 ```
 
@@ -340,20 +356,26 @@ Host: localhost:8080
 
 ```typescript
 {
-  method: "GET"           // Required: HTTP method (GET, POST, PUT, DELETE, etc.)
-  path: "/api/users"      // Required: URL path with leading /
-  latency: Latency        // Required: latency distribution config
-  responses: Response[]   // Required: response templates
-  request_match?: {       // Optional: match request body patterns
-    type: "json_path"     // Comparison type
-    pattern: "$.user_id"  // Pattern to match
-  }
+  id: "get-users",             // Required: unique identifier
+  method: "GET",               // Required: HTTP method
+  path: "/api/users",          // Required: URL path with leading /
+  request?: RequestMatch,       // Optional: request body matching
+  latency: Latency,             // Required: latency distribution config
+  response: Response,           // Required: response template
+  error_profile?: ErrorProfile, // Optional: error injection settings
+  rate_limit?: RateLimit,       // Optional: per-endpoint rate limit
+  bandwidth_cap?: BandwidthCap  // Optional: per-endpoint bandwidth cap
 }
 ```
 
 ### Latency Object
 
-All distributions support these fields:
+```typescript
+{
+  distribution: "fixed" | "normal" | "exponential" | "uniform" | "log_normal" | "mixture",
+  params: { ... } // Distribution-specific parameters
+}
+```
 
 ### Latency Profiles and Tuning
 
@@ -362,14 +384,14 @@ Use these profiles to shape response timing. The simulator samples a latency per
 #### Fixed
 
 - **Behavior**: Constant latency for every request.
-- **Parameters**: `value_ms` (integer, >= 0).
+- **Parameters**: `delay_ms` (integer, >= 0).
 - **Use when**: You want deterministic timing or to validate client-side timeouts.
 - **Tuning tip**: Set to your target steady-state latency (for example, 80-120 ms).
 
 #### Normal (Gaussian)
 
 - **Behavior**: Bell curve centered on `mean_ms` with symmetric variation.
-- **Parameters**: `mean_ms` (integer, > 0), `std_dev_ms` (integer, >= 0).
+- **Parameters**: `mean_ms` (integer, > 0), `stddev_ms` (integer, > 0).
 - **Use when**: Latency clusters around a typical value with moderate jitter.
 - **Tuning tips**:
   - About 68% of samples fall within 1 standard deviation and 95% within 2.
@@ -378,7 +400,7 @@ Use these profiles to shape response timing. The simulator samples a latency per
 #### Exponential
 
 - **Behavior**: Many fast responses with a long tail of slower ones.
-- **Parameters**: `mean_ms` (integer, > 0).
+- **Parameters**: `rate` (number, > 0). Use $rate = 1 / mean$.
 - **Use when**: You want realistic tail latency or occasional spikes.
 - **Tuning tips**:
   - Approximate percentiles: p50 ~ `mean_ms * 0.69`, p95 ~ `mean_ms * 3`, p99 ~ `mean_ms * 4.6`.
@@ -416,8 +438,8 @@ Use these profiles to shape response timing. The simulator samples a latency per
 
 ```json
 {
-  "type": "fixed",
-  "value_ms": 100
+  "distribution": "fixed",
+  "params": { "delay_ms": 100 }
 }
 ```
 
@@ -425,9 +447,8 @@ Use these profiles to shape response timing. The simulator samples a latency per
 
 ```json
 {
-  "type": "normal",
-  "mean_ms": 100,
-  "std_dev_ms": 20
+  "distribution": "normal",
+  "params": { "mean_ms": 100, "stddev_ms": 20 }
 }
 ```
 
@@ -435,20 +456,26 @@ Use these profiles to shape response timing. The simulator samples a latency per
 
 ```json
 {
-  "type": "exponential",
-  "mean_ms": 100
+  "distribution": "exponential",
+  "params": { "rate": 0.02 }
 }
 ```
 
 #### Uniform
 
+```json
+{
+  "distribution": "uniform",
+  "params": { "min_ms": 50, "max_ms": 150 }
+}
+```
+
 #### Log-normal
 
 ```json
 {
-  "type": "log_normal",
-  "mean_ms": 150,
-  "std_dev_ms": 60
+  "distribution": "log_normal",
+  "params": { "mean_ms": 150, "stddev_ms": 60 }
 }
 ```
 
@@ -456,27 +483,21 @@ Use these profiles to shape response timing. The simulator samples a latency per
 
 ```json
 {
-  "type": "mixture",
-  "components": [
-    {
-      "weight": 0.8,
-      "distribution": "fixed",
-      "params": { "delay_ms": 20 }
-    },
-    {
-      "weight": 0.2,
-      "distribution": "log_normal",
-      "params": { "mean_ms": 250, "std_dev_ms": 80 }
-    }
-  ]
-}
-```
-
-```json
-{
-  "type": "uniform",
-  "min_ms": 50,
-  "max_ms": 150
+  "distribution": "mixture",
+  "params": {
+    "components": [
+      {
+        "weight": 0.8,
+        "distribution": "fixed",
+        "params": { "delay_ms": 20 }
+      },
+      {
+        "weight": 0.2,
+        "distribution": "log_normal",
+        "params": { "mean_ms": 250, "stddev_ms": 80 }
+      }
+    ]
+  }
 }
 ```
 
@@ -485,8 +506,79 @@ Use these profiles to shape response timing. The simulator samples a latency per
 ```typescript
 {
   status: 200,                           // HTTP status code
-  body: "{\"users\": []}",              // JSON response body (as string)
-  error_rate: 0.05                       // Probability of error (0.0–1.0)
+  headers?: { [key: string]: string },   // Optional headers
+  body: "{\"users\": []}"              // JSON response body (as string)
+}
+```
+
+### ErrorProfile Object
+
+```typescript
+{
+  rate: 0.05,                // Error probability (0.0-1.0)
+  codes: [500, 503],          // Error status codes
+  body?: "{...}",            // Error response body
+  error_in_payload?: false,   // If true, error body returned with HTTP 200
+  payload_corruption?: {      // Optional corruption settings
+    rate: 0.2,
+    mode: "truncate" | "replace",
+    truncate_ratio?: 0.4,
+    replacement?: "{...}"
+  }
+}
+```
+
+### RequestMatch Object
+
+```typescript
+{
+  body_match: "any" | "exact" | "contains" | "ignore",
+  body?: string
+}
+```
+
+### EndpointGroup Object
+
+```typescript
+{
+  id: "core-apis",
+  endpoint_ids: ["get-users", "create-user"]
+}
+```
+
+### BehaviorWindow Object
+
+```typescript
+{
+  id?: "peak-load",
+  scope: { endpoint_id?: string, group_id?: string, global?: boolean },
+  schedule: {
+    mode: "fixed" | "recurring",
+    start_offset_ms?: number,
+    duration_ms: number,
+    every_ms?: number,
+    jitter_ms?: number,
+    max_occurrences?: number,
+    min_delay_ms?: number
+  },
+  ramp?: { up_ms?: number, down_ms?: number, curve?: "linear" | "s_curve" },
+  error_mix?: "override" | "additive" | "blend",
+  latency_override?: Latency,
+  error_profile_override?: ErrorProfile
+}
+```
+
+### BurstEvent Object
+
+```typescript
+{
+  id?: "error-spike",
+  scope: { endpoint_id?: string, group_id?: string, global?: boolean },
+  frequency: { every_ms: number, jitter_ms?: number },
+  duration_ms: number,
+  ramp?: { up_ms?: number, down_ms?: number, curve?: "linear" | "s_curve" },
+  latency_spike?: Latency,
+  error_spike?: { error_mix?: "override" | "additive" | "blend", error_profile: ErrorProfile }
 }
 ```
 
@@ -575,10 +667,12 @@ import requests
 config = {
     "version": "1.0",
     "endpoints": [{
-        "method": "GET",
-        "path": "/api/test",
-        "latency": {"type": "fixed", "value_ms": 100},
-        "responses": [{"status": 200, "body": '{"ok": true}', "error_rate": 0.0}]
+    "id": "test",
+    "method": "GET",
+    "path": "/api/test",
+    "latency": {"distribution": "fixed", "params": {"delay_ms": 100}},
+    "response": {"status": 200, "body": '{"ok": true}'},
+    "error_profile": {"rate": 0.0}
     }]
 }
 

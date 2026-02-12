@@ -1,0 +1,73 @@
+version: "1.0"
+metadata:
+  name: "burst-events"
+  description: "Clustered error and latency spikes"
+  author: "examples"
+  created: "2026-02-12T12:00:00Z"
+
+endpoints:
+  - id: "checkout"
+    method: "POST"
+    path: "/api/checkout"
+    latency:
+      distribution: "normal"
+      params:
+        mean_ms: 180
+        stddev_ms: 40
+    response:
+      status: 201
+      headers:
+        Content-Type: "application/json"
+      body: '{"order_id": "123", "status": "pending"}'
+    error_profile:
+      rate: 0.01
+      codes: [500]
+      body: '{"error": "Checkout failed"}'
+
+  - id: "payment"
+    method: "POST"
+    path: "/api/payment"
+    latency:
+      distribution: "normal"
+      params:
+        mean_ms: 220
+        stddev_ms: 60
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+      body: '{"status": "paid"}'
+    error_profile:
+      rate: 0.02
+      codes: [502]
+      body: '{"error": "Payment gateway error"}'
+
+endpoint_groups:
+  - id: "checkout-apis"
+    endpoint_ids: ["checkout", "payment"]
+
+burst_events:
+  - id: "spike-1"
+    scope:
+      group_id: "checkout-apis"
+    frequency:
+      every_ms: 300000
+      jitter_ms: 60000
+    duration_ms: 20000
+    ramp:
+      up_ms: 2000
+      down_ms: 2000
+      curve: "linear"
+    latency_spike:
+      distribution: "log_normal"
+      params:
+        mean_ms: 800
+        stddev_ms: 300
+    error_spike:
+      error_mix: "additive"
+      error_profile:
+        rate: 0.2
+        codes: [502, 503]
+        body: '{"error": "Transient spike"}'
+
+workflows: []

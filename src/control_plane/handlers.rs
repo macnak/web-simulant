@@ -1,12 +1,15 @@
 // Control plane API handlers
 
-use crate::config::{parse_auto, parse_json, parse_yaml, validate, Configuration, ConfigError, ValidationError};
+use crate::config::{
+	parse_auto, parse_json, parse_yaml, validate, Configuration, ConfigError, Endpoint, ValidationError,
+};
 use crate::control_plane::persistence::save_config;
 use crate::engine::EndpointRegistry;
 use axum::body::Bytes;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use serde::Serialize;
 use serde_json::json;
 use std::collections::HashMap;
@@ -38,11 +41,6 @@ struct StatusResponse {
 	endpoints_count: usize,
 }
 
-#[derive(Serialize)]
-struct MessageResponse {
-	status: &'static str,
-	message: String,
-}
 
 pub async fn health() -> impl IntoResponse {
 	axum::Json(json!({"status": "ok"}))
@@ -96,6 +94,63 @@ pub async fn get_endpoint(
 	).into_response()
 }
 
+pub async fn create_endpoint(
+	State(state): State<ControlPlaneState>,
+	Json(endpoint): Json<Endpoint>,
+) -> Response {
+	let mut config = match current_config(&state) {
+		Ok(config) => config,
+		Err(response) => return response,
+	};
+
+	if config.endpoints.iter().any(|e| e.id == endpoint.id) {
+		return conflict_response("Endpoint id already exists");
+	}
+
+	config.endpoints.push(endpoint.clone());
+	apply_config_update(&state, config, "Endpoint created", Some(&endpoint))
+}
+
+pub async fn update_endpoint(
+	State(state): State<ControlPlaneState>,
+	Path(endpoint_id): Path<String>,
+	Json(endpoint): Json<Endpoint>,
+) -> Response {
+	if endpoint.id != endpoint_id {
+		return bad_request_response("Endpoint id in path does not match payload");
+	}
+
+	let mut config = match current_config(&state) {
+		Ok(config) => config,
+		Err(response) => return response,
+	};
+
+	let Some(existing) = config.endpoints.iter().position(|e| e.id == endpoint_id) else {
+		return not_found_response("Endpoint not found");
+	};
+
+	config.endpoints[existing] = endpoint.clone();
+	apply_config_update(&state, config, "Endpoint updated", Some(&endpoint))
+}
+
+pub async fn delete_endpoint(
+	State(state): State<ControlPlaneState>,
+	Path(endpoint_id): Path<String>,
+) -> Response {
+	let mut config = match current_config(&state) {
+		Ok(config) => config,
+		Err(response) => return response,
+	};
+
+	let before = config.endpoints.len();
+	config.endpoints.retain(|e| e.id != endpoint_id);
+	if config.endpoints.len() == before {
+		return not_found_response("Endpoint not found");
+	}
+
+	apply_config_update(&state, config, "Endpoint deleted", None)
+}
+
 pub async fn validate_config(headers: HeaderMap, body: Bytes) -> Response {
 	match parse_config_from_body(headers, body) {
 		Ok(config) => match validate(&config) {
@@ -132,7 +187,7 @@ pub async fn import_config(
 		return parse_error_response(err);
 	}
 
-	state.registry.set_endpoints(config.endpoints.clone());
+	state.registry.set_config(config.clone());
 	let mut guard = state.config.write().expect("config write lock");
 	*guard = Some(config.clone());
 
@@ -273,6 +328,76 @@ fn parse_error_response(err: ConfigError) -> Response {
 		.into_response()
 }
 
+fn current_config(state: &ControlPlaneState) -> Result<Configuration, Response> {
+	let config = state.config.read().expect("config read lock");
+	if let Some(config) = config.as_ref() {
+		Ok(config.clone())
+	} else {
+		Err(not_found_response("No configuration currently loaded"))
+	}
+}
+
+fn apply_config_update(
+	state: &ControlPlaneState,
+	config: Configuration,
+	message: &str,
+	endpoint: Option<&Endpoint>,
+) -> Response {
+	if let Err(err) = validate(&config) {
+		return validation_error_response(err);
+	}
+
+	if let Err(err) = save_config(&state.config_path, &config) {
+		return parse_error_response(err);
+	}
+
+		state.registry.set_config(config.clone());
+	let mut guard = state.config.write().expect("config write lock");
+	*guard = Some(config.clone());
+
+	let summary = endpoint.map(to_summary);
+	let response = json!({
+		"status": "success",
+		"message": message,
+		"endpoint": summary,
+		"endpoints_count": config.endpoints.len()
+	});
+	axum::Json(response).into_response()
+}
+
+fn not_found_response(message: &str) -> Response {
+	(
+		axum::http::StatusCode::NOT_FOUND,
+		axum::Json(json!({
+			"status": "error",
+			"message": message
+		})),
+	)
+		.into_response()
+}
+
+fn bad_request_response(message: &str) -> Response {
+	(
+		axum::http::StatusCode::BAD_REQUEST,
+		axum::Json(json!({
+			"status": "error",
+			"message": message
+		})),
+	)
+		.into_response()
+}
+
+fn conflict_response(message: &str) -> Response {
+	(
+		axum::http::StatusCode::CONFLICT,
+		axum::Json(json!({
+			"status": "error",
+			"message": message
+		})),
+	)
+		.into_response()
+}
+
 fn map_validation_error(error: ValidationError) -> serde_json::Value {
 	let mut value = json!({
 		"field": error.field,
@@ -392,5 +517,31 @@ mod tests {
 			.unwrap();
 
 		assert_eq!(response.status(), StatusCode::OK);
+	}
+
+	#[tokio::test]
+	async fn test_create_endpoint_without_config() {
+		let router = crate::control_plane::server::build_router(state());
+		let payload = serde_json::json!({
+			"id": "new-endpoint",
+			"method": "GET",
+			"path": "/new",
+			"latency": {"distribution": "fixed", "params": {"delay_ms": 1}},
+			"response": {"status": 200, "headers": {"Content-Type": "application/json"}, "body": "{}"},
+			"error_profile": {"rate": 0.0}
+		});
+		let response = router
+			.oneshot(
+				axum::http::Request::builder()
+					.method("POST")
+					.uri("/api/endpoints")
+					.header("Content-Type", "application/json")
+					.body(axum::body::Body::from(payload.to_string()))
+					.unwrap(),
+			)
+			.await
+			.unwrap();
+
+		assert_eq!(response.status(), StatusCode::NOT_FOUND);
 	}
 }

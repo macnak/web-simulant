@@ -4,9 +4,10 @@
 
 use super::error::ConfigError;
 use super::{
-    BandwidthCap, BehaviorWindow, BodyMatchType, Configuration, DistributionParams, DistributionType,
-    Endpoint, ErrorProfile, HttpMethod, LatencyConfig, MixtureComponent, RateLimit, RequestMatch,
-    Response, ValidationError,
+    BandwidthCap, BehaviorSchedule, BehaviorScope, BehaviorWindow, BodyMatchType, BurstEvent,
+    Configuration, DistributionParams, DistributionType, Endpoint, EndpointGroup, ErrorMix,
+    ErrorProfile, HttpMethod, LatencyConfig, MixtureComponent, RampConfig,
+    RateLimit, RequestMatch, Response, ScheduleMode, ValidationError,
 };
 use std::collections::HashSet;
 
@@ -48,6 +49,10 @@ pub fn validate(config: &Configuration) -> Result<(), ConfigError> {
         }
     }
 
+    validate_endpoint_groups(&config.endpoint_groups, &ids, &mut errors);
+    validate_behavior_windows(&config.behavior_windows, &config.endpoint_groups, &ids, &mut errors);
+    validate_burst_events(&config.burst_events, &config.endpoint_groups, &ids, &mut errors);
+
     if !errors.is_empty() {
         let count = errors.len();
         return Err(ConfigError::ValidationError(count, errors));
@@ -77,8 +82,40 @@ fn validate_endpoint(endpoint: &Endpoint, errors: &mut Vec<ValidationError>) {
     validate_error_profile(&endpoint.error_profile, errors, location.clone());
     validate_rate_limit(endpoint.rate_limit.as_ref(), errors, location.clone());
     validate_bandwidth_cap(endpoint.bandwidth_cap.as_ref(), errors, location.clone());
-    validate_behavior_windows(&endpoint.behavior_windows, errors, location.clone());
     validate_request_match(endpoint.request.as_ref(), errors, location);
+}
+
+fn validate_endpoint_groups(
+    groups: &[EndpointGroup],
+    endpoint_ids: &HashSet<String>,
+    errors: &mut Vec<ValidationError>,
+) {
+    let mut group_ids = HashSet::new();
+
+    for group in groups {
+        if group.id.trim().is_empty() {
+            push_error(errors, "endpoint_groups.id", "id must not be empty", Some(group.id.clone()));
+        }
+
+        if !group_ids.insert(group.id.clone()) {
+            push_error(errors, "endpoint_groups.id", "duplicate group id", Some(group.id.clone()));
+        }
+
+        if group.endpoint_ids.is_empty() {
+            push_error(errors, "endpoint_groups.endpoint_ids", "must include at least one endpoint id", Some(group.id.clone()));
+        }
+
+        for endpoint_id in &group.endpoint_ids {
+            if !endpoint_ids.contains(endpoint_id) {
+                push_error(
+                    errors,
+                    "endpoint_groups.endpoint_ids",
+                    "endpoint id does not exist",
+                    Some(endpoint_id.clone()),
+                );
+            }
+        }
+    }
 }
 
 fn validate_rate_limit(
@@ -125,36 +162,344 @@ fn validate_bandwidth_cap(
     }
 }
 
+
 fn validate_behavior_windows(
     windows: &[BehaviorWindow],
+    groups: &[EndpointGroup],
+    endpoint_ids: &HashSet<String>,
     errors: &mut Vec<ValidationError>,
-    location: Option<String>,
 ) {
-    for (index, window) in windows.iter().enumerate() {
-        if !window.start_offset_ms.is_finite() || window.start_offset_ms < 0.0 {
-            push_error(
-                errors,
-                "behavior_windows.start_offset_ms",
-                &format!("window {} start_offset_ms must be >= 0", index),
-                location.clone(),
-            );
-        }
+    let mut scope_fixed: Vec<(String, f64, f64)> = Vec::new();
+    let mut scope_recurring = HashSet::new();
+    let group_ids: HashSet<String> = groups.iter().map(|group| group.id.clone()).collect();
 
-        if !window.end_offset_ms.is_finite() || window.end_offset_ms <= window.start_offset_ms {
-            push_error(
-                errors,
-                "behavior_windows.end_offset_ms",
-                &format!("window {} end_offset_ms must be > start_offset_ms", index),
-                location.clone(),
-            );
+    for (index, window) in windows.iter().enumerate() {
+        let scope_key = validate_scope(&window.scope, &group_ids, endpoint_ids, errors);
+
+        if !validate_schedule(&window.schedule, errors, scope_key.as_deref()) {
+            continue;
         }
 
         if let Some(latency) = &window.latency_override {
-            validate_latency(latency, errors, location.clone());
+            validate_latency(latency, errors, scope_key.clone());
         }
 
         if let Some(profile) = &window.error_profile_override {
-            validate_error_profile(profile, errors, location.clone());
+            validate_error_profile(profile, errors, scope_key.clone());
+        }
+
+        if window.error_mix == ErrorMix::Additive && window.error_profile_override.is_none() {
+            push_error(
+                errors,
+                "behavior_windows.error_profile_override",
+                "error_profile_override required for additive mix",
+                scope_key.clone(),
+            );
+        }
+
+        match window.schedule.mode {
+            ScheduleMode::Fixed => {
+                let start_ms = window.schedule.start_offset_ms.unwrap_or(0.0);
+                let end_ms = start_ms + window.schedule.duration_ms;
+                if let Some(scope_key) = scope_key.as_ref() {
+                    scope_fixed.push((scope_key.clone(), start_ms, end_ms));
+                }
+            }
+            ScheduleMode::Recurring => {
+                if let Some(scope_key) = scope_key.as_ref() {
+                    if !scope_recurring.insert(scope_key.clone()) {
+                        push_error(
+                            errors,
+                            "behavior_windows.schedule",
+                            "multiple recurring windows for the same scope",
+                            Some(scope_key.clone()),
+                        );
+                    }
+                }
+            }
+        }
+
+        if window.ramp.is_some() {
+            validate_ramp(
+                window.ramp.as_ref().unwrap(),
+                "behavior_windows.ramp",
+                errors,
+                scope_key.clone(),
+            );
+        }
+
+        if scope_key.is_none() {
+            push_error(
+                errors,
+                "behavior_windows.scope",
+                &format!("window {} scope is invalid", index),
+                None,
+            );
+        }
+    }
+
+    scope_fixed.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)));
+    for window in scope_fixed.windows(2) {
+        let (scope_a, _start_a, end_a) = (&window[0].0, window[0].1, window[0].2);
+        let (scope_b, start_b, _end_b) = (&window[1].0, window[1].1, window[1].2);
+        if scope_a == scope_b && start_b < end_a {
+            push_error(
+                errors,
+                "behavior_windows.schedule",
+                "fixed windows overlap for the same scope",
+                Some(scope_a.clone()),
+            );
+        }
+    }
+}
+
+fn validate_burst_events(
+    bursts: &[BurstEvent],
+    groups: &[EndpointGroup],
+    endpoint_ids: &HashSet<String>,
+    errors: &mut Vec<ValidationError>,
+) {
+    let group_ids: HashSet<String> = groups.iter().map(|group| group.id.clone()).collect();
+
+    for burst in bursts {
+        let scope_key = validate_scope(&burst.scope, &group_ids, endpoint_ids, errors);
+
+        if !burst.duration_ms.is_finite() || burst.duration_ms <= 0.0 {
+            push_error(
+                errors,
+                "burst_events.duration_ms",
+                "duration_ms must be > 0",
+                scope_key.clone(),
+            );
+        }
+
+        if !burst.frequency.every_ms.is_finite() || burst.frequency.every_ms <= 0.0 {
+            push_error(
+                errors,
+                "burst_events.frequency.every_ms",
+                "every_ms must be > 0",
+                scope_key.clone(),
+            );
+        }
+
+        if let Some(jitter) = burst.frequency.jitter_ms {
+            if !jitter.is_finite() || jitter < 0.0 {
+                push_error(
+                    errors,
+                    "burst_events.frequency.jitter_ms",
+                    "jitter_ms must be >= 0",
+                    scope_key.clone(),
+                );
+            }
+            if jitter > 0.0 && jitter > (burst.frequency.every_ms - burst.duration_ms) {
+                push_error(
+                    errors,
+                    "burst_events.frequency.jitter_ms",
+                    "jitter_ms must be <= every_ms - duration_ms",
+                    scope_key.clone(),
+                );
+            }
+        }
+
+        if burst.duration_ms > burst.frequency.every_ms {
+            push_error(
+                errors,
+                "burst_events.duration_ms",
+                "duration_ms must be <= every_ms",
+                scope_key.clone(),
+            );
+        }
+
+        if let Some(latency) = &burst.latency_spike {
+            validate_latency(latency, errors, scope_key.clone());
+        }
+
+        if let Some(error_spike) = &burst.error_spike {
+            validate_error_profile(&error_spike.error_profile, errors, scope_key.clone());
+        }
+
+        if let Some(ramp) = &burst.ramp {
+            validate_ramp(ramp, "burst_events.ramp", errors, scope_key.clone());
+        }
+
+        if scope_key.is_none() {
+            push_error(errors, "burst_events.scope", "scope is invalid", None);
+        }
+    }
+}
+
+fn validate_scope(
+    scope: &BehaviorScope,
+    group_ids: &HashSet<String>,
+    endpoint_ids: &HashSet<String>,
+    errors: &mut Vec<ValidationError>,
+) -> Option<String> {
+    let mut count = 0;
+    if scope.endpoint_id.as_ref().map_or(false, |v| !v.trim().is_empty()) {
+        count += 1;
+        if let Some(endpoint_id) = &scope.endpoint_id {
+            if !endpoint_ids.contains(endpoint_id) {
+                push_error(errors, "scope.endpoint_id", "endpoint id does not exist", Some(endpoint_id.clone()));
+            }
+        }
+    }
+    if scope.group_id.as_ref().map_or(false, |v| !v.trim().is_empty()) {
+        count += 1;
+        if let Some(group_id) = &scope.group_id {
+            if !group_ids.contains(group_id) {
+                push_error(errors, "scope.group_id", "group id does not exist", Some(group_id.clone()));
+            }
+        }
+    }
+    if scope.global {
+        count += 1;
+    }
+
+    if count != 1 {
+        push_error(errors, "scope", "must define exactly one of endpoint_id, group_id, or global", None);
+        return None;
+    }
+
+    if scope.global {
+        return Some("global".to_string());
+    }
+    if let Some(endpoint_id) = &scope.endpoint_id {
+        return Some(format!("endpoint: {}", endpoint_id));
+    }
+    scope.group_id.as_ref().map(|group_id| format!("group: {}", group_id))
+}
+
+fn validate_schedule(
+    schedule: &BehaviorSchedule,
+    errors: &mut Vec<ValidationError>,
+    location: Option<&str>,
+) -> bool {
+    if !schedule.duration_ms.is_finite() || schedule.duration_ms <= 0.0 {
+        push_error(
+            errors,
+            "behavior_windows.schedule.duration_ms",
+            "duration_ms must be > 0",
+            location.map(|value| value.to_string()),
+        );
+        return false;
+    }
+
+    match schedule.mode {
+        ScheduleMode::Fixed => {
+            let Some(start_ms) = schedule.start_offset_ms else {
+                push_error(
+                    errors,
+                    "behavior_windows.schedule.start_offset_ms",
+                    "start_offset_ms is required for fixed schedules",
+                    location.map(|value| value.to_string()),
+                );
+                return false;
+            };
+            if !start_ms.is_finite() || start_ms < 0.0 {
+                push_error(
+                    errors,
+                    "behavior_windows.schedule.start_offset_ms",
+                    "start_offset_ms must be >= 0",
+                    location.map(|value| value.to_string()),
+                );
+                return false;
+            }
+        }
+        ScheduleMode::Recurring => {
+            let Some(every_ms) = schedule.every_ms else {
+                push_error(
+                    errors,
+                    "behavior_windows.schedule.every_ms",
+                    "every_ms is required for recurring schedules",
+                    location.map(|value| value.to_string()),
+                );
+                return false;
+            };
+
+            if !every_ms.is_finite() || every_ms <= 0.0 {
+                push_error(
+                    errors,
+                    "behavior_windows.schedule.every_ms",
+                    "every_ms must be > 0",
+                    location.map(|value| value.to_string()),
+                );
+                return false;
+            }
+
+            if schedule.duration_ms > every_ms {
+                push_error(
+                    errors,
+                    "behavior_windows.schedule.duration_ms",
+                    "duration_ms must be <= every_ms",
+                    location.map(|value| value.to_string()),
+                );
+                return false;
+            }
+
+            if let Some(jitter_ms) = schedule.jitter_ms {
+                if !jitter_ms.is_finite() || jitter_ms < 0.0 {
+                    push_error(
+                        errors,
+                        "behavior_windows.schedule.jitter_ms",
+                        "jitter_ms must be >= 0",
+                        location.map(|value| value.to_string()),
+                    );
+                    return false;
+                }
+                if jitter_ms > (every_ms - schedule.duration_ms) {
+                    push_error(
+                        errors,
+                        "behavior_windows.schedule.jitter_ms",
+                        "jitter_ms must be <= every_ms - duration_ms",
+                        location.map(|value| value.to_string()),
+                    );
+                    return false;
+                }
+            }
+
+            if let Some(min_delay_ms) = schedule.min_delay_ms {
+                if !min_delay_ms.is_finite() || min_delay_ms < 0.0 {
+                    push_error(
+                        errors,
+                        "behavior_windows.schedule.min_delay_ms",
+                        "min_delay_ms must be >= 0",
+                        location.map(|value| value.to_string()),
+                    );
+                    return false;
+                }
+            }
+
+            if let Some(max_occurrences) = schedule.max_occurrences {
+                if max_occurrences == 0 {
+                    push_error(
+                        errors,
+                        "behavior_windows.schedule.max_occurrences",
+                        "max_occurrences must be > 0",
+                        location.map(|value| value.to_string()),
+                    );
+                    return false;
+                }
+            }
+        }
+    }
+
+    true
+}
+
+fn validate_ramp(
+    ramp: &RampConfig,
+    prefix: &str,
+    errors: &mut Vec<ValidationError>,
+    location: Option<String>,
+) {
+    if let Some(up_ms) = ramp.up_ms {
+        if !up_ms.is_finite() || up_ms < 0.0 {
+            push_error(errors, &format!("{}.up_ms", prefix), "up_ms must be >= 0", location.clone());
+        }
+    }
+    if let Some(down_ms) = ramp.down_ms {
+        if !down_ms.is_finite() || down_ms < 0.0 {
+            push_error(errors, &format!("{}.down_ms", prefix), "down_ms must be >= 0", location.clone());
         }
     }
 }
@@ -375,7 +720,6 @@ mod tests {
             error_profile: ErrorProfile::default(),
             rate_limit: None,
             bandwidth_cap: None,
-            behavior_windows: vec![],
             loaded_at: None,
             rate_limiter: None,
         }
@@ -394,6 +738,9 @@ mod tests {
                     params: DistributionParams::Fixed { delay_ms: 5.0 },
                 },
             )],
+            endpoint_groups: vec![],
+            behavior_windows: vec![],
+            burst_events: vec![],
             workflows: vec![],
         }
     }
@@ -726,35 +1073,4 @@ mod tests {
         assert!(errors.iter().any(|e| e.field == "request.body"));
     }
 
-    #[test]
-    fn test_validate_behavior_window_offsets() {
-        let mut config = base_config();
-        config.endpoints[0].behavior_windows = vec![BehaviorWindow {
-            start_offset_ms: 500.0,
-            end_offset_ms: 100.0,
-            latency_override: None,
-            error_profile_override: None,
-        }];
-        let errors = validation_errors(&config);
-        assert!(errors.iter().any(|e| e.field == "behavior_windows.end_offset_ms"));
-    }
-
-    #[test]
-    fn test_validate_behavior_window_latency_override() {
-        let mut config = base_config();
-        config.endpoints[0].behavior_windows = vec![BehaviorWindow {
-            start_offset_ms: 0.0,
-            end_offset_ms: 1000.0,
-            latency_override: Some(LatencyConfig {
-                distribution: DistributionType::Normal,
-                params: DistributionParams::Normal {
-                    mean_ms: 50.0,
-                    stddev_ms: 0.0,
-                },
-            }),
-            error_profile_override: None,
-        }];
-        let errors = validation_errors(&config);
-        assert!(errors.iter().any(|e| e.field == "latency.params.stddev_ms"));
-    }
 }

@@ -5,7 +5,6 @@ mod handlers;
 mod persistence;
 
 pub use server::*;
-pub use handlers::*;
 pub use persistence::*;
 
 #[cfg(test)]

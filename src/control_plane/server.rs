@@ -1,8 +1,9 @@
 // Control plane HTTP server (port 8081)
 
 use crate::control_plane::handlers::{
-	export_config, get_endpoint, health, import_config, import_config_multipart, list_endpoints,
-	status, validate_config, ControlPlaneState,
+	create_endpoint, delete_endpoint, export_config, get_endpoint, health, import_config,
+	import_config_multipart, list_endpoints, status, update_endpoint, validate_config,
+	ControlPlaneState,
 };
 use crate::engine::EndpointRegistry;
 use axum::routing::{get, get_service, post};
@@ -20,8 +21,11 @@ pub fn build_router(state: ControlPlaneState) -> Router {
 		.route("/", get_service(ServeFile::new("static/index.html")))
 		.route("/api/health", get(health))
 		.route("/api/status", get(status))
-		.route("/api/endpoints", get(list_endpoints))
-		.route("/api/endpoints/:id", get(get_endpoint))
+		.route("/api/endpoints", get(list_endpoints).post(create_endpoint))
+		.route(
+			"/api/endpoints/:id",
+			get(get_endpoint).put(update_endpoint).delete(delete_endpoint),
+		)
 		.route("/api/config/export", get(export_config))
 		.route("/api/config/validate", post(validate_config))
 		.route("/api/config/import", post(import_config))

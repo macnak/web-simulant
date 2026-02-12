@@ -6,11 +6,9 @@ mod server;
 mod registry;
 mod response;
 
-pub use router::*;
 pub use handler::*;
 pub use server::*;
 pub use registry::*;
-pub use response::*;
 
 #[cfg(test)]
 mod tests {

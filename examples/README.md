@@ -108,10 +108,11 @@ Each example configuration is a complete, valid YAML file that can be uploaded d
 
 **Characteristics**:
 
-- 1 endpoint with behavior windows
+- 1 endpoint grouped into `status-apis`
 - Baseline latency: 50ms fixed
 - Degradation window: 1000-4000ms latency + 15% errors
 - Recovery window: 200-400ms latency + 2% errors
+- Windows defined at top-level scope
 
 **Best for**: Incident drills, resilience testing, recovery validation
 
@@ -162,6 +163,22 @@ Each example configuration is a complete, valid YAML file that can be uploaded d
 - Clear error body patterns
 
 **Best for**: Client robustness testing, parsing failure scenarios
+
+---
+
+### 09-burst-events.yaml
+
+**Purpose**: Clustered error and latency spikes
+
+**Use case**: Simulate short-lived spikes without long windows
+
+**Characteristics**:
+
+- Grouped endpoints with a shared burst event
+- Short bursts (20s) every few minutes with jitter
+- Error spikes (additive) and latency spikes
+
+**Best for**: Outlier clustering, transient incident drills
 
 ---
 

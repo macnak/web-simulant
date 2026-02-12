@@ -14,7 +14,10 @@ This document will convert the overview into testable requirements, acceptance c
 - [Phase 2] The system shall add latency distributions per endpoint (log-normal, multi-modal).
 - [Phase 1] The system shall support error injection (status codes).
 - [Phase 2] The system shall support error injection (payload corruption, error-in-payload).
-- [Phase 2] The system shall support time-window behavior changes (degradation, recovery, outages).
+- [Phase 2] The system shall support time-window behavior changes (degradation, recovery, outages) with optional ramp-up/ramp-down.
+- [Phase 2] The system shall support recurring windows (cadence + jitter + max occurrences) without overlapping windows for the same scope.
+- [Phase 2] The system shall support scoped behavior windows applied to endpoint groups, individual endpoints, or global defaults.
+- [Phase 2] The system shall support burst events for clustered errors/latency outliers scoped to endpoint groups or individual endpoints.
 - [Phase 2] The system shall support rate limiting by TPS/TPH and bandwidth caps per endpoint or workflow.
 - [Phase 2] The system shall provide a simple UI to add/edit endpoints and configure behavior.
 - [Phase 1] The system shall import/export configuration via UI download/upload.

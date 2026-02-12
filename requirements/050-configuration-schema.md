@@ -42,6 +42,12 @@ endpoints:
   - id: "create-user"
     # endpoint definition
 
+endpoint_groups:
+  - id: "core-apis"
+    endpoint_ids: ["get-users", "create-user"]
+
+behavior_windows: []
+burst_events: []
 workflows: [] # Phase 2 feature, empty for now
 ```
 
@@ -89,19 +95,6 @@ Each endpoint simulates a specific API route with configurable behavior.
 
   bandwidth_cap:
     bytes_per_second: 10240 # 10 KB/s
-
-  behavior_windows:
-    - start_offset_ms: 30000
-      end_offset_ms: 60000
-      latency_override:
-        distribution: "uniform"
-        params:
-          min_ms: 200
-          max_ms: 800
-      error_profile_override:
-        rate: 0.1
-        codes: [503]
-        body: '{"error": "Degraded"}'
 ```
 
 ---
@@ -334,37 +327,79 @@ bandwidth_cap:
   bytes_per_second: 10240 # 10 KB/s
 ```
 
+## Endpoint Groups (Phase 2)
+
+Groups allow behaviors to target a set of endpoints without duplicating rules.
+
+```yaml
+endpoint_groups:
+  - id: "core-apis"
+    endpoint_ids: ["get-users", "create-user", "search-users"]
+```
+
 ## Behavior Windows (Phase 2)
+
+Behavior windows override latency and/or errors for a period of time.
 
 ```yaml
 behavior_windows:
-  - start_offset_ms: 30000
-    end_offset_ms: 60000
+  - id: "peak-load"
+    scope:
+      group_id: "core-apis"
+    schedule:
+      mode: "recurring"
+      every_ms: 3600000
+      jitter_ms: 120000
+      max_occurrences: 2
+      duration_ms: 4200000
+      min_delay_ms: 900000
+    ramp:
+      up_ms: 900000
+      down_ms: 900000
+      curve: "linear"
+    error_mix: "override" # override | additive | blend
     latency_override:
       distribution: "uniform"
       params:
-        min_ms: 200
-        max_ms: 800
+        min_ms: 500
+        max_ms: 12000
     error_profile_override:
-      rate: 0.1
-      codes: [503]
-      body: '{"error": "Degraded"}'
+      rate: 0.12
+      codes: [500, 502, 503]
+      body: '{"error": "Downstream degraded"}'
 ```
 
-````
+`schedule.mode: fixed` uses `start_offset_ms` + `duration_ms` instead of recurrence.
 
-### Clustered Errors (Phase 2)
+## Burst Events (Phase 2)
 
-For future enhancement - errors occur in bursts:
+Burst events model clustered outliers or error spikes that are shorter and more frequent than windows.
 
 ```yaml
-error_profile:
-  rate: 0.05
-  clustering:
-    enabled: true
-    window_ms: 5000
-    burst_probability: 0.8
-````
+burst_events:
+  - id: "error-spike"
+    scope:
+      endpoint_id: "create-user"
+    frequency:
+      every_ms: 300000
+      jitter_ms: 60000
+    duration_ms: 20000
+    ramp:
+      up_ms: 2000
+      down_ms: 2000
+      curve: "linear"
+    latency_spike:
+      distribution: "log_normal"
+      params:
+        mean_ms: 800
+        stddev_ms: 300
+    error_spike:
+      error_mix: "additive"
+      error_profile:
+        rate: 0.25
+        codes: [502, 503]
+        body: '{"error": "Transient spike"}'
+```
 
 ---
 
@@ -477,6 +512,9 @@ workflows: []
 - `endpoints[].request`: Request matching configuration (defaults to "any")
 - `endpoints[].request.body_match`: "any", "exact", "contains", "ignore" (defaults to "any")
 - `endpoints[].request.body`: Required if `body_match` is "exact" or "contains"
+- `endpoint_groups`: Optional list of endpoint groups with `endpoint_ids`
+- `behavior_windows`: Optional list of window definitions targeting endpoint groups, endpoints, or global
+- `burst_events`: Optional list of burst definitions targeting endpoint groups, endpoints, or global
 
 ### Constraints
 
@@ -485,6 +523,9 @@ workflows: []
 - **Valid error rates**: `error_profile.rate` must be 0.0 to 1.0
 - **Valid status codes**: Must be valid HTTP status codes (100-599)
 - **Request body matching**: If `body_match` is "exact" or "contains", `body` must be provided
+- **Window non-overlap**: A single scope cannot have overlapping active windows (per schedule instance)
+- **Window schedules**: `duration_ms > 0`; `every_ms > 0` for recurring schedules
+- **Burst schedules**: `duration_ms > 0`; `frequency.every_ms > 0` if provided
 - **Distribution params**:
   - `normal`: `mean_ms ≥ 0`, `stddev_ms > 0`
   - `exponential`: `rate > 0`

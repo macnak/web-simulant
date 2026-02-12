@@ -16,6 +16,7 @@ pub enum ConfigError {
 
 impl ConfigError {
     /// Get validation errors if this is a ValidationError
+    #[allow(dead_code)]
     pub fn validation_errors(&self) -> Option<&[ValidationError]> {
         match self {
             ConfigError::ValidationError(_, errors) => Some(errors),

@@ -1,19 +1,25 @@
 // Endpoint request handler
 
 use crate::config::{
-	BandwidthCap, BehaviorWindow, BodyMatchType, DistributionParams, DistributionType, Endpoint,
-	ErrorProfile, LatencyConfig, MixtureComponent, RequestMatch,
+	BandwidthCap, BehaviorSchedule, BehaviorWindow, BodyMatchType, BurstEvent, DistributionParams,
+	DistributionType, Endpoint, ErrorMix, ErrorProfile, LatencyConfig, MixtureComponent,
+	RampConfig, RampCurve, RequestMatch, ScheduleMode,
 };
 use crate::distributions::{
 	Distribution, ExponentialDistribution, FixedDistribution, LogNormalDistribution, NormalDistribution,
 	UniformDistribution,
 };
 use crate::engine::response::{build_plain_text, build_response};
+use crate::engine::{EndpointBehaviors, ResolvedEndpoint};
 use axum::response::Response;
 use rand::Rng;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::time::Duration;
 
-pub async fn handle_request(endpoint: &Endpoint, request_body: &str) -> Response {
+pub async fn handle_request(resolved: &ResolvedEndpoint, request_body: &str) -> Response {
+	let endpoint = &resolved.endpoint;
+	let behaviors = &resolved.behaviors;
 	if !request_matches(request_body, endpoint.request.as_ref()) {
 		return build_plain_text(400, "Request body did not match");
 	}
@@ -22,8 +28,8 @@ pub async fn handle_request(endpoint: &Endpoint, request_body: &str) -> Response
 		return build_plain_text(429, "Rate limit exceeded");
 	}
 
-	let (latency_config, error_profile) = effective_behavior(endpoint);
-	let delay = sample_latency(latency_config);
+	let elapsed_ms = elapsed_ms(endpoint);
+	let delay = sample_latency_with_behaviors(endpoint, behaviors, elapsed_ms);
 	if delay > Duration::from_millis(0) {
 		tokio::time::sleep(delay).await;
 	}
@@ -31,18 +37,19 @@ pub async fn handle_request(endpoint: &Endpoint, request_body: &str) -> Response
 	let mut status = endpoint.response.status;
 	let mut body = endpoint.response.body.as_str();
 
-	if should_error(error_profile) {
+	let error_profile = effective_error_profile(endpoint, behaviors, elapsed_ms);
+	if should_error(&error_profile) {
 		if error_profile.error_in_payload {
 			if !error_profile.body.is_empty() {
 				body = error_profile.body.as_str();
 			}
 		} else {
-			status = pick_error_status(error_profile);
+			status = pick_error_status(&error_profile);
 			body = error_profile.body.as_str();
 		}
 	}
 
-	let final_body = apply_payload_corruption(body, error_profile);
+	let final_body = apply_payload_corruption(body, &error_profile);
 
 	let bandwidth_delay = compute_bandwidth_delay(&final_body, endpoint.bandwidth_cap.as_ref());
 	if bandwidth_delay > Duration::from_millis(0) {
@@ -52,30 +59,303 @@ pub async fn handle_request(endpoint: &Endpoint, request_body: &str) -> Response
 	build_response(status, &endpoint.response.headers, &final_body)
 }
 
-fn effective_behavior(endpoint: &Endpoint) -> (&LatencyConfig, &ErrorProfile) {
-	if let Some(window) = active_window(endpoint) {
-		let latency = window.latency_override.as_ref().unwrap_or(&endpoint.latency);
-		let error_profile = window
-			.error_profile_override
-			.as_ref()
-			.unwrap_or(&endpoint.error_profile);
-		return (latency, error_profile);
-	}
-
-	(&endpoint.latency, &endpoint.error_profile)
+fn elapsed_ms(endpoint: &Endpoint) -> f64 {
+	endpoint
+		.loaded_at
+		.map(|loaded_at| loaded_at.elapsed().as_millis() as f64)
+		.unwrap_or(0.0)
 }
 
-fn active_window(endpoint: &Endpoint) -> Option<&BehaviorWindow> {
-	let loaded_at = endpoint.loaded_at?;
-	let elapsed_ms = loaded_at.elapsed().as_millis() as f64;
+fn sample_latency_with_behaviors(
+	endpoint: &Endpoint,
+	behaviors: &EndpointBehaviors,
+	elapsed_ms: f64,
+) -> Duration {
+	let mut base_sample = sample_latency(&endpoint.latency);
 
-	for window in &endpoint.behavior_windows {
-		if elapsed_ms >= window.start_offset_ms && elapsed_ms < window.end_offset_ms {
-			return Some(window);
+	if let Some((window, factor)) = active_window(behaviors, elapsed_ms) {
+		if let Some(latency_override) = window.latency_override.as_ref() {
+			base_sample = blend_latency(&endpoint.latency, latency_override, factor);
+		}
+	}
+
+	if let Some((burst, factor)) = active_burst(behaviors, elapsed_ms) {
+		if let Some(latency_override) = burst.latency_spike.as_ref() {
+			let roll: f64 = rand::thread_rng().gen();
+			if factor >= 1.0 || roll < factor {
+				return sample_latency(latency_override);
+			}
+		}
+	}
+
+	base_sample
+}
+
+fn blend_latency(base: &LatencyConfig, override_latency: &LatencyConfig, factor: f64) -> Duration {
+	if factor <= 0.0 {
+		return sample_latency(base);
+	}
+	if factor >= 1.0 {
+		return sample_latency(override_latency);
+	}
+	let roll: f64 = rand::thread_rng().gen();
+	if roll < factor {
+		sample_latency(override_latency)
+	} else {
+		sample_latency(base)
+	}
+}
+
+fn effective_error_profile(
+	endpoint: &Endpoint,
+	behaviors: &EndpointBehaviors,
+	elapsed_ms: f64,
+) -> ErrorProfile {
+	let mut profile = endpoint.error_profile.clone();
+
+	if let Some((window, factor)) = active_window(behaviors, elapsed_ms) {
+		if let Some(override_profile) = window.error_profile_override.as_ref() {
+			profile = merge_error_profiles(&profile, override_profile, window.error_mix.clone(), factor);
+		}
+	}
+
+	if let Some((burst, factor)) = active_burst(behaviors, elapsed_ms) {
+		if let Some(error_spike) = burst.error_spike.as_ref() {
+			profile = merge_error_profiles(
+				&profile,
+				&error_spike.error_profile,
+				error_spike.error_mix.clone(),
+				factor,
+			);
+		}
+	}
+
+	profile
+}
+
+fn merge_error_profiles(
+	base: &ErrorProfile,
+	override_profile: &ErrorProfile,
+	mix: ErrorMix,
+	factor: f64,
+) -> ErrorProfile {
+	let factor = factor.clamp(0.0, 1.0);
+	let (base_weight, override_weight) = match mix {
+		ErrorMix::Override => (1.0 - factor, factor),
+		ErrorMix::Additive => (1.0, factor),
+		ErrorMix::Blend => (1.0 - factor, factor),
+	};
+
+	let base_rate = base.rate.max(0.0) * base_weight;
+	let override_rate = override_profile.rate.max(0.0) * override_weight;
+	let combined_rate = (base_rate + override_rate).min(1.0);
+
+	let mut codes = base.codes.clone();
+	for code in &override_profile.codes {
+		if !codes.contains(code) {
+			codes.push(*code);
+		}
+	}
+
+	let body = if override_weight > 0.5 && !override_profile.body.is_empty() {
+		override_profile.body.clone()
+	} else {
+		base.body.clone()
+	};
+
+	let error_in_payload = if override_weight > 0.5 {
+		override_profile.error_in_payload
+	} else {
+		base.error_in_payload
+	};
+
+	let payload_corruption = if override_weight > 0.5 {
+		override_profile.payload_corruption.clone().or_else(|| base.payload_corruption.clone())
+	} else {
+		base.payload_corruption.clone().or_else(|| override_profile.payload_corruption.clone())
+	};
+
+	ErrorProfile {
+		rate: combined_rate,
+		codes,
+		body,
+		error_in_payload,
+		payload_corruption,
+	}
+}
+
+fn active_window(
+	behaviors: &EndpointBehaviors,
+	elapsed_ms: f64,
+) -> Option<(&BehaviorWindow, f64)> {
+	for window in &behaviors.windows {
+		if let Some((start_ms, end_ms)) = schedule_range(&window.schedule, elapsed_ms, window) {
+			if elapsed_ms >= start_ms && elapsed_ms < end_ms {
+				let factor = ramp_factor(elapsed_ms, start_ms, end_ms, window.ramp.as_ref());
+				return Some((window, factor));
+			}
 		}
 	}
 
 	None
+}
+
+fn active_burst(
+	behaviors: &EndpointBehaviors,
+	elapsed_ms: f64,
+) -> Option<(&BurstEvent, f64)> {
+	for burst in &behaviors.bursts {
+		let frequency = &burst.frequency;
+		if let Some((start_ms, end_ms)) = burst_range(frequency, burst.duration_ms, elapsed_ms, burst) {
+			if elapsed_ms >= start_ms && elapsed_ms < end_ms {
+				let factor = ramp_factor(elapsed_ms, start_ms, end_ms, burst.ramp.as_ref());
+				return Some((burst, factor));
+			}
+		}
+	}
+
+	None
+}
+
+fn schedule_range(
+	schedule: &BehaviorSchedule,
+	elapsed_ms: f64,
+	window: &BehaviorWindow,
+) -> Option<(f64, f64)> {
+	match schedule.mode {
+		ScheduleMode::Fixed => {
+			let start_ms = schedule.start_offset_ms.unwrap_or(0.0);
+			let end_ms = start_ms + schedule.duration_ms;
+			Some((start_ms, end_ms))
+		}
+		ScheduleMode::Recurring => {
+			let every_ms = schedule.every_ms.unwrap_or(0.0);
+			if every_ms <= 0.0 {
+				return None;
+			}
+			let min_delay_ms = schedule.min_delay_ms.unwrap_or(0.0);
+			if elapsed_ms < min_delay_ms {
+				return None;
+			}
+			let elapsed_since_start = elapsed_ms - min_delay_ms;
+			let occurrence = (elapsed_since_start / every_ms).floor() as u32;
+			if let Some(max_occurrences) = schedule.max_occurrences {
+				if occurrence >= max_occurrences {
+					return None;
+				}
+			}
+			let base_start = min_delay_ms + (occurrence as f64 * every_ms);
+			let jitter_ms = schedule.jitter_ms.unwrap_or(0.0);
+			let jitter = jitter_for_window(window, occurrence, jitter_ms);
+			let start_ms = (base_start + jitter).max(min_delay_ms).max(0.0);
+			let end_ms = start_ms + schedule.duration_ms;
+			Some((start_ms, end_ms))
+		}
+	}
+}
+
+fn burst_range(
+	frequency: &crate::config::BurstFrequency,
+	duration_ms: f64,
+	elapsed_ms: f64,
+	burst: &BurstEvent,
+) -> Option<(f64, f64)> {
+	let every_ms = frequency.every_ms;
+	if every_ms <= 0.0 {
+		return None;
+	}
+	let occurrence = (elapsed_ms / every_ms).floor() as u32;
+	let base_start = occurrence as f64 * every_ms;
+	let jitter_ms = frequency.jitter_ms.unwrap_or(0.0);
+	let jitter = jitter_for_burst(burst, occurrence, jitter_ms);
+	let start_ms = (base_start + jitter).max(0.0);
+	let end_ms = start_ms + duration_ms;
+	Some((start_ms, end_ms))
+}
+
+fn jitter_for_window(window: &BehaviorWindow, occurrence: u32, jitter_ms: f64) -> f64 {
+	if jitter_ms <= 0.0 {
+		return 0.0;
+	}
+	let mut hasher = DefaultHasher::new();
+	window_key(window).hash(&mut hasher);
+	occurrence.hash(&mut hasher);
+	let hash = hasher.finish();
+	let roll = (hash % 10_000) as f64 / 10_000.0;
+	(roll * 2.0 - 1.0) * jitter_ms
+}
+
+fn jitter_for_burst(burst: &BurstEvent, occurrence: u32, jitter_ms: f64) -> f64 {
+	if jitter_ms <= 0.0 {
+		return 0.0;
+	}
+	let mut hasher = DefaultHasher::new();
+	burst_key(burst).hash(&mut hasher);
+	occurrence.hash(&mut hasher);
+	let hash = hasher.finish();
+	let roll = (hash % 10_000) as f64 / 10_000.0;
+	(roll * 2.0 - 1.0) * jitter_ms
+}
+
+fn window_key(window: &BehaviorWindow) -> String {
+	if let Some(id) = &window.id {
+		return id.clone();
+	}
+	if window.scope.global {
+		return "global".to_string();
+	}
+	if let Some(endpoint_id) = &window.scope.endpoint_id {
+		return format!("endpoint:{}", endpoint_id);
+	}
+	if let Some(group_id) = &window.scope.group_id {
+		return format!("group:{}", group_id);
+	}
+	"window".to_string()
+}
+
+fn burst_key(burst: &BurstEvent) -> String {
+	if let Some(id) = &burst.id {
+		return id.clone();
+	}
+	if burst.scope.global {
+		return "global".to_string();
+	}
+	if let Some(endpoint_id) = &burst.scope.endpoint_id {
+		return format!("endpoint:{}", endpoint_id);
+	}
+	if let Some(group_id) = &burst.scope.group_id {
+		return format!("group:{}", group_id);
+	}
+	"burst".to_string()
+}
+
+fn ramp_factor(elapsed_ms: f64, start_ms: f64, end_ms: f64, ramp: Option<&RampConfig>) -> f64 {
+	let Some(ramp) = ramp else {
+		return 1.0;
+	};
+	let duration = end_ms - start_ms;
+	if duration <= 0.0 {
+		return 1.0;
+	}
+	let up_ms = ramp.up_ms.unwrap_or(0.0).max(0.0);
+	let down_ms = ramp.down_ms.unwrap_or(0.0).max(0.0);
+	let progress = elapsed_ms - start_ms;
+	let mut factor = 1.0;
+	if up_ms > 0.0 && progress < up_ms {
+		factor = progress / up_ms;
+	} else if down_ms > 0.0 && elapsed_ms > (end_ms - down_ms) {
+		factor = (end_ms - elapsed_ms) / down_ms;
+	}
+	let factor = factor.clamp(0.0, 1.0);
+	match ramp.curve {
+		Some(RampCurve::SCurve) => smoothstep(factor),
+		_ => factor,
+	}
+}
+
+fn smoothstep(value: f64) -> f64 {
+	let value = value.clamp(0.0, 1.0);
+	value * value * (3.0 - 2.0 * value)
 }
 
 fn check_rate_limit(endpoint: &Endpoint) -> bool {
@@ -246,7 +526,6 @@ mod tests {
 			error_profile: ErrorProfile::default(),
 			rate_limit: None,
 			bandwidth_cap: None,
-			behavior_windows: vec![],
 			loaded_at: None,
 			rate_limiter: None,
 		}
@@ -255,7 +534,14 @@ mod tests {
 	#[tokio::test]
 	async fn test_handle_request_success() {
 		let endpoint = base_endpoint();
-		let response = handle_request(&endpoint, "").await;
+		let resolved = ResolvedEndpoint {
+			endpoint,
+			behaviors: EndpointBehaviors {
+				windows: vec![],
+				bursts: vec![],
+			},
+		};
+		let response = handle_request(&resolved, "").await;
 		assert_eq!(response.status(), axum::http::StatusCode::OK);
 	}
 

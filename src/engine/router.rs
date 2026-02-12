@@ -1,15 +1,16 @@
 // Request routing logic
 
-use crate::config::{Endpoint, HttpMethod};
-use crate::engine::EndpointRegistry;
+use crate::config::HttpMethod;
+use crate::engine::{EndpointRegistry, ResolvedEndpoint};
 use std::sync::Arc;
 
 /// Match method + path to a configured endpoint
+#[allow(dead_code)]
 pub fn match_route(
 	registry: Arc<EndpointRegistry>,
 	method: &HttpMethod,
 	path: &str,
-) -> Option<Endpoint> {
+) -> Option<ResolvedEndpoint> {
 	registry.get(method, path)
 }
 
@@ -17,7 +18,7 @@ pub fn match_route(
 mod tests {
 	use super::*;
 	use crate::config::{
-		DistributionParams, DistributionType, ErrorProfile, LatencyConfig, Response,
+		DistributionParams, DistributionType, Endpoint, ErrorProfile, LatencyConfig, Response,
 	};
 	use std::collections::HashMap;
 
@@ -39,7 +40,6 @@ mod tests {
 			error_profile: ErrorProfile::default(),
 			rate_limit: None,
 			bandwidth_cap: None,
-			behavior_windows: vec![],
 			loaded_at: None,
 			rate_limiter: None,
 		}
@@ -51,6 +51,8 @@ mod tests {
 		registry.set_endpoints(vec![endpoint("health", HttpMethod::Get, "/health")]);
 		let matched = match_route(registry, &HttpMethod::Get, "/health");
 		assert!(matched.is_some());
+		let matched = matched.unwrap();
+		assert_eq!(matched.endpoint.id, "health");
 	}
 
 	#[test]
@@ -60,4 +62,5 @@ mod tests {
 		let matched = match_route(registry, &HttpMethod::Post, "/health");
 		assert!(matched.is_none());
 	}
+
 }

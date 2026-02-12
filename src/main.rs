@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     let control_state = control_plane::default_state(registry.clone());
 
     if let Ok(Some(config)) = control_plane::load_config(&control_state.config_path) {
-        registry.set_endpoints(config.endpoints.clone());
+        registry.set_config(config.clone());
         let mut guard = control_state.config.write().expect("config write lock");
         *guard = Some(config);
     }

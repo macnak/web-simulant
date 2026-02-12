@@ -15,6 +15,12 @@ pub struct Configuration {
     pub metadata: Metadata,
     pub endpoints: Vec<Endpoint>,
     #[serde(default)]
+    pub endpoint_groups: Vec<EndpointGroup>,
+    #[serde(default)]
+    pub behavior_windows: Vec<BehaviorWindow>,
+    #[serde(default)]
+    pub burst_events: Vec<BurstEvent>,
+    #[serde(default)]
     pub workflows: Vec<Workflow>,
 }
 
@@ -47,23 +53,134 @@ pub struct Endpoint {
     pub rate_limit: Option<RateLimit>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bandwidth_cap: Option<BandwidthCap>,
-    #[serde(default)]
-    pub behavior_windows: Vec<BehaviorWindow>,
     #[serde(skip)]
     pub loaded_at: Option<Instant>,
     #[serde(skip)]
     pub rate_limiter: Option<Arc<Mutex<TokenBucket>>>,
 }
 
-/// Time-window behavior overrides
+/// Endpoint group definition.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EndpointGroup {
+    pub id: String,
+    pub endpoint_ids: Vec<String>,
+}
+
+/// Scope for behavior rules.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehaviorScope {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endpoint_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+    #[serde(default)]
+    pub global: bool,
+}
+
+/// Schedule for behavior windows.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehaviorSchedule {
+    pub mode: ScheduleMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_offset_ms: Option<f64>,
+    pub duration_ms: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub every_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jitter_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_occurrences: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_delay_ms: Option<f64>,
+}
+
+/// Schedule modes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ScheduleMode {
+    Fixed,
+    Recurring,
+}
+
+/// Ramp configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RampConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub up_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub down_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub curve: Option<RampCurve>,
+}
+
+/// Ramp curves.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RampCurve {
+    Linear,
+    SCurve,
+}
+
+/// Error mix strategies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ErrorMix {
+    Override,
+    Additive,
+    Blend,
+}
+
+fn default_error_mix() -> ErrorMix {
+    ErrorMix::Override
+}
+
+/// Time-window behavior overrides.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BehaviorWindow {
-    pub start_offset_ms: f64,
-    pub end_offset_ms: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub scope: BehaviorScope,
+    pub schedule: BehaviorSchedule,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ramp: Option<RampConfig>,
+    #[serde(default = "default_error_mix")]
+    pub error_mix: ErrorMix,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latency_override: Option<LatencyConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_profile_override: Option<ErrorProfile>,
+}
+
+/// Burst events for clustered spikes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BurstEvent {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    pub scope: BehaviorScope,
+    pub frequency: BurstFrequency,
+    pub duration_ms: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ramp: Option<RampConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_spike: Option<LatencyConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_spike: Option<ErrorSpike>,
+}
+
+/// Burst frequency settings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BurstFrequency {
+    pub every_ms: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jitter_ms: Option<f64>,
+}
+
+/// Error spike settings for bursts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorSpike {
+    #[serde(default = "default_error_mix")]
+    pub error_mix: ErrorMix,
+    pub error_profile: ErrorProfile,
 }
 
 /// Request rate limiting configuration

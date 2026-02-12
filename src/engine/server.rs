@@ -5,7 +5,7 @@ use crate::engine::{handle_request, EndpointRegistry};
 use crate::engine::response::build_plain_text;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::{Method, Request, StatusCode};
+use axum::http::Method;
 use axum::routing::any;
 use axum::Router;
 use std::future::Future;
@@ -83,6 +83,7 @@ mod tests {
 	use crate::config::{DistributionParams, DistributionType, Endpoint, ErrorProfile, LatencyConfig, Response};
 	use std::collections::HashMap;
 	use tower::util::ServiceExt;
+	use axum::http::{Request, StatusCode};
 
 	fn endpoint(id: &str, method: HttpMethod, path: &str) -> Endpoint {
 		Endpoint {
@@ -102,7 +103,6 @@ mod tests {
 			error_profile: ErrorProfile::default(),
 			rate_limit: None,
 			bandwidth_cap: None,
-			behavior_windows: vec![],
 			loaded_at: None,
 			rate_limiter: None,
 		}
