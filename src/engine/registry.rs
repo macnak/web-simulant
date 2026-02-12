@@ -1,8 +1,9 @@
 // Endpoint registry
 
-use crate::config::{Endpoint, HttpMethod};
+use crate::config::{Endpoint, HttpMethod, TokenBucket};
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::Instant;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct RouteKey {
@@ -38,6 +39,18 @@ impl EndpointRegistry {
 	}
 
 	pub fn set_endpoints(&self, endpoints: Vec<Endpoint>) {
+		let loaded_at = Instant::now();
+		let mut endpoints = endpoints;
+		for endpoint in &mut endpoints {
+			endpoint.loaded_at = Some(loaded_at);
+			endpoint.rate_limiter = endpoint.rate_limit.as_ref().map(|limit| {
+				Arc::new(Mutex::new(TokenBucket::new(
+					limit.requests_per_second,
+					limit.burst,
+				)))
+			});
+		}
+
 		let mut by_route = HashMap::new();
 		for endpoint in &endpoints {
 			let key = RouteKey::new(&endpoint.method, &endpoint.path);
@@ -95,6 +108,11 @@ mod tests {
 				body: "{}".to_string(),
 			},
 			error_profile: ErrorProfile::default(),
+			rate_limit: None,
+			bandwidth_cap: None,
+			behavior_windows: vec![],
+			loaded_at: None,
+			rate_limiter: None,
 		}
 	}
 

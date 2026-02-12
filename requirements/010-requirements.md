@@ -10,11 +10,13 @@ This document will convert the overview into testable requirements, acceptance c
 ## 2. Functional Requirements
 
 - [Phase 1] The system shall allow definition of API endpoints with method, path, and response behavior.
-- [Phase 1] The system shall simulate latency distributions per endpoint (fixed, Gaussian, log-normal, exponential, multi-modal).
-- [Phase 1] The system shall support error injection (status codes, payload corruption, error-in-payload).
-- [Phase 1] The system shall support time-window behavior changes (degradation, recovery, outages).
-- [Phase 1] The system shall support rate limiting by TPS/TPH and bandwidth caps per endpoint or workflow.
-- [Phase 1] The system shall provide a simple UI to add endpoints and configure behavior.
+- [Phase 1] The system shall simulate latency distributions per endpoint (fixed, normal/Gaussian, exponential, uniform).
+- [Phase 2] The system shall add latency distributions per endpoint (log-normal, multi-modal).
+- [Phase 1] The system shall support error injection (status codes).
+- [Phase 2] The system shall support error injection (payload corruption, error-in-payload).
+- [Phase 2] The system shall support time-window behavior changes (degradation, recovery, outages).
+- [Phase 2] The system shall support rate limiting by TPS/TPH and bandwidth caps per endpoint or workflow.
+- [Phase 2] The system shall provide a simple UI to add/edit endpoints and configure behavior.
 - [Phase 1] The system shall import/export configuration via UI download/upload.
 - [Phase 1] The system shall expose a minimal health/status endpoint.
 - [Phase 2] The system shall support workflow/group overrides with explicit precedence rules.
@@ -28,7 +30,7 @@ This document will convert the overview into testable requirements, acceptance c
 - [Phase 1] Distribution accuracy within 10% for sample sizes >=100; clearer at ~1,000 samples.
 - [Phase 1] Probabilistic determinism: results converge to configured shapes at scale.
 - [Phase 1] Resource efficiency: minimal CPU and memory usage while meeting targets.
-- [Phase 1] CPU warnings at >80% for 10s, elevated at 90%, critical at 100%.
+- [Phase 2] CPU warnings at >80% for 10s, elevated at 90%, critical at 100%.
 - [Phase 1] Logging is plain text with timestamps and DEBUG/INFO/WARN/ERROR levels.
 - [Phase 1] Deployment is single executable or single Docker image (no distributed first release).
 - [Phase 2] Expanded observability and admin controls as needed.

@@ -194,27 +194,57 @@
 
 ---
 
+## Requirements Reconciliation Summary
+
+Phase 1 delivered the core engine, control plane, UI, and Docker packaging. The following Phase 1 requirements were intentionally deferred to Phase 2 to keep v1.0.0 scope stable:
+
+- Log-normal and multi-modal latency distributions
+- Time-window behavior changes (degradation, recovery, outages)
+- Rate limiting and bandwidth caps
+- Error injection extensions (payload corruption, error-in-payload)
+- UI endpoint editor (add/edit/delete)
+- CPU warning thresholds and basic metrics endpoint
+
+Phase tags were updated in [requirements/010-requirements.md](requirements/010-requirements.md) to reflect the deferred scope.
+
+---
+
 ## Next Steps (In Order)
 
-### 1. Phase 1.12: Polish & Documentation (NEXT)
+### 1. Phase 2 Planning and Delivery (NEXT)
 
 **Status**: Ready to start  
-**Location**: Project root  
-**Estimated time**: ~8 hours
+**Location**: requirements/ and src/  
+**Estimated time**: TBD (recommend splitting into 3 sub-phases)
 
-**Tasks**:
+**Plan**: [requirements/090-phase2-implementation.md](requirements/090-phase2-implementation.md)
 
-- Update README.md with comprehensive documentation
-- Generate API documentation
-- Tag v1.0.0 and create release
-- Final verification
+**Proposed Phase 2 sub-phases**:
+
+1. **Behavior Modeling Expansion**
+
+- Log-normal and multi-modal latency distributions
+- Time-window behavior changes
+- Error injection extensions
+- Rate limiting and bandwidth caps
+
+2. **Control Plane CRUD + UI Editor**
+
+- Endpoint CRUD APIs
+- UI editor (add/edit/delete endpoints)
+- Validation and conflict reporting
+
+3. **Observability + Versioning**
+
+- Config version metadata
+- Basic metrics endpoint
+- CPU warning thresholds
 
 **Done criteria**:
 
-- README complete with all sections
-- API docs generated
-- v1.0.0 tag created and pushed
-- All tests pass in release build
+- New behavior modes validated by tests and examples
+- CRUD workflows for endpoints and scenarios
+- Versioned configs and observable metrics
 
 ---
 
@@ -331,25 +361,21 @@ web-simulant/
 
 ---
 
-## How to Pick Up Tomorrow
+## How to Pick Up Next (Phase 2)
 
-1. **Read this file** (`PROJECT-STATUS.md`) to understand current state
-2. **Review** Phase 1.10 completion: integration smoke tests
-3. **Start with** Phase 1.11: Docker deployment (~6 hours)
-
-- Create Dockerfile for release build
-- Add docker-compose for local run
-
-4. **Follow milestones** - Next is Release v1.0.0 by Day 15
-5. **Update this file** after completing Phase 1.11
+1. **Read** [requirements/001-phased-plan.md](requirements/001-phased-plan.md) for Phase 2-4 scope and acceptance criteria
+2. **Review** [requirements/010-requirements.md](requirements/010-requirements.md) for deferred Phase 2 items
+3. **Decide** Phase 2 ordering (behavior modeling vs CRUD/UI vs observability)
+4. **Create** Phase 2 implementation plan and estimates
+5. **Update** this file after each Phase 2 sub-phase
 
 **Quick commands**:
 
 ```bash
 cd /home/macnak/development/personal/mixed-languages/web-simulant
-cargo build              # Should succeed with warnings (expected)
-cargo test               # Run tests (parser/validator + distributions + engine + control plane)
-scripts/integration-smoke.sh # Run end-to-end smoke test
+cargo build --release
+cargo test
+scripts/integration-smoke.sh
 ```
 
 ---

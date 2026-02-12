@@ -1,0 +1,29 @@
+version: "1.0"
+metadata:
+  name: "rate-limit-bandwidth"
+  description: "Rate limiting and bandwidth caps"
+  author: "examples"
+  created: "2026-02-12T12:00:00Z"
+
+endpoints:
+  - id: "report"
+    method: "GET"
+    path: "/api/report"
+    latency:
+      distribution: "fixed"
+      params:
+        delay_ms: 50
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+      body: '{"report": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}'
+    error_profile:
+      rate: 0.0
+    rate_limit:
+      requests_per_second: 5
+      burst: 2
+    bandwidth_cap:
+      bytes_per_second: 10240
+
+workflows: []

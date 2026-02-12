@@ -4,11 +4,13 @@ mod fixed;
 mod normal;
 mod exponential;
 mod uniform;
+mod log_normal;
 
 pub use fixed::FixedDistribution;
 pub use normal::NormalDistribution;
 pub use exponential::ExponentialDistribution;
 pub use uniform::UniformDistribution;
+pub use log_normal::LogNormalDistribution;
 
 use std::time::Duration;
 

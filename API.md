@@ -391,6 +391,20 @@ Use these profiles to shape response timing. The simulator samples a latency per
 - **Use when**: You want bounded jitter without a central peak.
 - **Tuning tip**: Set `min_ms` to your baseline latency and `max_ms` to your worst-case bound.
 
+#### Log-normal
+
+- **Behavior**: Right-skewed with a long tail of slow responses.
+- **Parameters**: `mean_ms` (integer, > 0), `stddev_ms` (integer, >= 0).
+- **Use when**: You want realistic tail latency without a hard upper bound.
+- **Tuning tip**: Increase `stddev_ms` to make the tail heavier.
+
+#### Mixture
+
+- **Behavior**: Weighted blend of multiple distributions (bimodal or multi-modal).
+- **Parameters**: `components` array with `weight`, `distribution`, and `params`.
+- **Use when**: You want cache hit/miss style behavior.
+- **Tuning tip**: Weights are relative; they do not need to sum to 1.0.
+
 #### Choosing a Profile
 
 - **Deterministic SLO checks**: Fixed
@@ -427,6 +441,36 @@ Use these profiles to shape response timing. The simulator samples a latency per
 ```
 
 #### Uniform
+
+#### Log-normal
+
+```json
+{
+  "type": "log_normal",
+  "mean_ms": 150,
+  "std_dev_ms": 60
+}
+```
+
+#### Mixture
+
+```json
+{
+  "type": "mixture",
+  "components": [
+    {
+      "weight": 0.8,
+      "distribution": "fixed",
+      "params": { "delay_ms": 20 }
+    },
+    {
+      "weight": 0.2,
+      "distribution": "log_normal",
+      "params": { "mean_ms": 250, "std_dev_ms": 80 }
+    }
+  ]
+}
+```
 
 ```json
 {
@@ -476,7 +520,22 @@ All error responses follow this format:
 
 ## Rate Limiting & Quotas
 
-None. Web Simulant supports unlimited concurrent requests (subject to system resources).
+Web Simulant supports optional per-endpoint rate limits and bandwidth caps via configuration.
+
+**Rate limit**:
+
+```yaml
+rate_limit:
+  requests_per_second: 5
+  burst: 2
+```
+
+**Bandwidth cap**:
+
+```yaml
+bandwidth_cap:
+  bytes_per_second: 10240
+```
 
 ---
 

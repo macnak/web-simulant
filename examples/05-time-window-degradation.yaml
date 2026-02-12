@@ -1,0 +1,47 @@
+version: "1.0"
+metadata:
+  name: "time-window-degradation"
+  description: "Scheduled degradation and recovery windows"
+  author: "examples"
+  created: "2026-02-12T12:00:00Z"
+
+endpoints:
+  - id: "status"
+    method: "GET"
+    path: "/api/status"
+    latency:
+      distribution: "fixed"
+      params:
+        delay_ms: 50
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+      body: '{"status": "ok"}'
+    error_profile:
+      rate: 0.0
+    behavior_windows:
+      - start_offset_ms: 30000
+        end_offset_ms: 60000
+        latency_override:
+          distribution: "uniform"
+          params:
+            min_ms: 1000
+            max_ms: 4000
+        error_profile_override:
+          rate: 0.15
+          codes: [503]
+          body: '{"error": "Degraded"}'
+      - start_offset_ms: 60000
+        end_offset_ms: 90000
+        latency_override:
+          distribution: "uniform"
+          params:
+            min_ms: 200
+            max_ms: 400
+        error_profile_override:
+          rate: 0.02
+          codes: [500]
+          body: '{"error": "Recovering"}'
+
+workflows: []

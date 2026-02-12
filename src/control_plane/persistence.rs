@@ -57,6 +57,11 @@ mod tests {
 					body: "ok".to_string(),
 				},
 				error_profile: ErrorProfile::default(),
+				rate_limit: None,
+				bandwidth_cap: None,
+				behavior_windows: vec![],
+				loaded_at: None,
+				rate_limiter: None,
 			}],
 			workflows: vec![],
 		}

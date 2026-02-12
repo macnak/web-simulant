@@ -100,6 +100,71 @@ Each example configuration is a complete, valid YAML file that can be uploaded d
 
 ---
 
+### 05-time-window-degradation.yaml
+
+**Purpose**: Scheduled degradation and recovery windows
+
+**Use case**: Simulate incidents with a clear start and recovery period
+
+**Characteristics**:
+
+- 1 endpoint with behavior windows
+- Baseline latency: 50ms fixed
+- Degradation window: 1000-4000ms latency + 15% errors
+- Recovery window: 200-400ms latency + 2% errors
+
+**Best for**: Incident drills, resilience testing, recovery validation
+
+---
+
+### 06-mixture-lognormal-latency.yaml
+
+**Purpose**: Realistic tail latency using log-normal and mixture profiles
+
+**Use case**: Model services with bimodal latency (cache hits vs misses)
+
+**Characteristics**:
+
+- Mixture distribution (80% fast, 20% slow)
+- Log-normal distribution for long-tail behavior
+- Low error rate
+
+**Best for**: Tail-latency analysis, percentile validation
+
+---
+
+### 07-rate-limit-bandwidth.yaml
+
+**Purpose**: Enforce TPS limits and bandwidth caps
+
+**Use case**: Throttling scenarios, client retry testing
+
+**Characteristics**:
+
+- Rate limit: 5 requests/sec with small burst
+- Bandwidth cap: 10 KB/s
+- Deterministic payload sizes
+
+**Best for**: Rate limit handling, backoff validation
+
+---
+
+### 08-error-payload-corruption.yaml
+
+**Purpose**: Error-in-payload and payload corruption behavior
+
+**Use case**: Validate clients against partial responses or error bodies with 200 status
+
+**Characteristics**:
+
+- Error-in-payload (HTTP 200)
+- Payload truncation and replacement modes
+- Clear error body patterns
+
+**Best for**: Client robustness testing, parsing failure scenarios
+
+---
+
 ## Usage
 
 ### Import Configuration
@@ -192,13 +257,88 @@ latency:
 
 Use for: typical API operations, database queries
 
-```yaml
+````yaml
 latency:
   distribution: "normal"
   params:
     mean_ms: 100
     stddev_ms: 20
+
+### Tail Latency (Log-normal)
+
+Use for: services with long-tail latency and occasional slow responses
+
+```yaml
+latency:
+  distribution: "log_normal"
+  params:
+    mean_ms: 150
+    stddev_ms: 60
+````
+
+### Bimodal Latency (Mixture)
+
+Use for: cache hit/miss scenarios with two distinct latency modes
+
+```yaml
+latency:
+  distribution: "mixture"
+  params:
+    components:
+      - weight: 0.8
+        distribution: "fixed"
+        params:
+          delay_ms: 20
+      - weight: 0.2
+        distribution: "log_normal"
+        params:
+          mean_ms: 250
+          stddev_ms: 80
 ```
+
+### Rate Limiting (TPS)
+
+Use for: throttle handling and retry behavior
+
+```yaml
+rate_limit:
+  requests_per_second: 5
+  burst: 2
+```
+
+### Bandwidth Cap
+
+Use for: slow links or response size throttling
+
+```yaml
+bandwidth_cap:
+  bytes_per_second: 10240 # 10 KB/s
+```
+
+### Error-In-Payload (HTTP 200)
+
+Use for: APIs that return error payloads with success status
+
+```yaml
+error_profile:
+  rate: 0.1
+  error_in_payload: true
+  body: '{"error": "Upstream timeout"}'
+```
+
+### Payload Corruption
+
+Use for: partial/truncated responses or forced replacements
+
+```yaml
+error_profile:
+  payload_corruption:
+    rate: 0.2
+    mode: "truncate"
+    truncate_ratio: 0.4
+```
+
+````
 
 ### Slow Operations (200ms+)
 
@@ -210,7 +350,7 @@ latency:
   params:
     min_ms: 500
     max_ms: 2000
-```
+````
 
 ---
 

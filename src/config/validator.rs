@@ -4,8 +4,9 @@
 
 use super::error::ConfigError;
 use super::{
-    BodyMatchType, Configuration, DistributionParams, DistributionType, Endpoint, ErrorProfile,
-    HttpMethod, LatencyConfig, RequestMatch, Response, ValidationError,
+    BandwidthCap, BehaviorWindow, BodyMatchType, Configuration, DistributionParams, DistributionType,
+    Endpoint, ErrorProfile, HttpMethod, LatencyConfig, MixtureComponent, RateLimit, RequestMatch,
+    Response, ValidationError,
 };
 use std::collections::HashSet;
 
@@ -74,11 +75,101 @@ fn validate_endpoint(endpoint: &Endpoint, errors: &mut Vec<ValidationError>) {
     validate_latency(&endpoint.latency, errors, location.clone());
     validate_response(&endpoint.response, errors, location.clone());
     validate_error_profile(&endpoint.error_profile, errors, location.clone());
+    validate_rate_limit(endpoint.rate_limit.as_ref(), errors, location.clone());
+    validate_bandwidth_cap(endpoint.bandwidth_cap.as_ref(), errors, location.clone());
+    validate_behavior_windows(&endpoint.behavior_windows, errors, location.clone());
     validate_request_match(endpoint.request.as_ref(), errors, location);
 }
 
+fn validate_rate_limit(
+    rate_limit: Option<&RateLimit>,
+    errors: &mut Vec<ValidationError>,
+    location: Option<String>,
+) {
+    let Some(rate_limit) = rate_limit else {
+        return;
+    };
+
+    if !rate_limit.requests_per_second.is_finite() || rate_limit.requests_per_second <= 0.0 {
+        push_error(
+            errors,
+            "rate_limit.requests_per_second",
+            "must be > 0",
+            location.clone(),
+        );
+    }
+
+    if let Some(burst) = rate_limit.burst {
+        if !burst.is_finite() || burst <= 0.0 {
+            push_error(errors, "rate_limit.burst", "must be > 0", location);
+        }
+    }
+}
+
+fn validate_bandwidth_cap(
+    bandwidth: Option<&BandwidthCap>,
+    errors: &mut Vec<ValidationError>,
+    location: Option<String>,
+) {
+    let Some(bandwidth) = bandwidth else {
+        return;
+    };
+
+    if !bandwidth.bytes_per_second.is_finite() || bandwidth.bytes_per_second <= 0.0 {
+        push_error(
+            errors,
+            "bandwidth_cap.bytes_per_second",
+            "must be > 0",
+            location,
+        );
+    }
+}
+
+fn validate_behavior_windows(
+    windows: &[BehaviorWindow],
+    errors: &mut Vec<ValidationError>,
+    location: Option<String>,
+) {
+    for (index, window) in windows.iter().enumerate() {
+        if !window.start_offset_ms.is_finite() || window.start_offset_ms < 0.0 {
+            push_error(
+                errors,
+                "behavior_windows.start_offset_ms",
+                &format!("window {} start_offset_ms must be >= 0", index),
+                location.clone(),
+            );
+        }
+
+        if !window.end_offset_ms.is_finite() || window.end_offset_ms <= window.start_offset_ms {
+            push_error(
+                errors,
+                "behavior_windows.end_offset_ms",
+                &format!("window {} end_offset_ms must be > start_offset_ms", index),
+                location.clone(),
+            );
+        }
+
+        if let Some(latency) = &window.latency_override {
+            validate_latency(latency, errors, location.clone());
+        }
+
+        if let Some(profile) = &window.error_profile_override {
+            validate_error_profile(profile, errors, location.clone());
+        }
+    }
+}
+
 fn validate_latency(latency: &LatencyConfig, errors: &mut Vec<ValidationError>, location: Option<String>) {
-    match (&latency.distribution, &latency.params) {
+    validate_distribution(&latency.distribution, &latency.params, errors, location);
+}
+
+fn validate_distribution(
+    distribution: &DistributionType,
+    params: &DistributionParams,
+    errors: &mut Vec<ValidationError>,
+    location: Option<String>,
+) {
+    match (distribution, params) {
         (DistributionType::Fixed, DistributionParams::Fixed { delay_ms }) => {
             if !delay_ms.is_finite() || *delay_ms < 0.0 {
                 push_error(errors, "latency.params.delay_ms", "must be >= 0", location);
@@ -105,6 +196,17 @@ fn validate_latency(latency: &LatencyConfig, errors: &mut Vec<ValidationError>, 
                 push_error(errors, "latency.params.max_ms", "must be > min_ms", location);
             }
         }
+        (DistributionType::LogNormal, DistributionParams::LogNormal { mean_ms, stddev_ms }) => {
+            if !mean_ms.is_finite() || *mean_ms <= 0.0 {
+                push_error(errors, "latency.params.mean_ms", "must be > 0", location.clone());
+            }
+            if !stddev_ms.is_finite() || *stddev_ms < 0.0 {
+                push_error(errors, "latency.params.stddev_ms", "must be >= 0", location);
+            }
+        }
+        (DistributionType::Mixture, DistributionParams::Mixture { components }) => {
+            validate_mixture_components(components, errors, location);
+        }
         _ => {
             push_error(
                 errors,
@@ -113,6 +215,58 @@ fn validate_latency(latency: &LatencyConfig, errors: &mut Vec<ValidationError>, 
                 location,
             );
         }
+    }
+}
+
+fn validate_mixture_components(
+    components: &[MixtureComponent],
+    errors: &mut Vec<ValidationError>,
+    location: Option<String>,
+) {
+    if components.is_empty() {
+        push_error(errors, "latency.params.components", "must include at least one component", location);
+        return;
+    }
+
+    let mut total_weight = 0.0;
+
+    for (index, component) in components.iter().enumerate() {
+        if !component.weight.is_finite() || component.weight <= 0.0 {
+            push_error(
+                errors,
+                "latency.params.components.weight",
+                &format!("component {} weight must be > 0", index),
+                location.clone(),
+            );
+        } else {
+            total_weight += component.weight;
+        }
+
+        if component.distribution == DistributionType::Mixture {
+            push_error(
+                errors,
+                "latency.params.components.distribution",
+                &format!("component {} distribution cannot be mixture", index),
+                location.clone(),
+            );
+            continue;
+        }
+
+        validate_distribution(
+            &component.distribution,
+            component.params.as_ref(),
+            errors,
+            location.clone(),
+        );
+    }
+
+    if total_weight <= 0.0 {
+        push_error(
+            errors,
+            "latency.params.components.weight",
+            "total weight must be > 0",
+            location,
+        );
     }
 }
 
@@ -127,7 +281,7 @@ fn validate_error_profile(profile: &ErrorProfile, errors: &mut Vec<ValidationErr
         push_error(errors, "error_profile.rate", "must be between 0.0 and 1.0", location.clone());
     }
 
-    if profile.rate > 0.0 && profile.codes.is_empty() {
+    if profile.rate > 0.0 && profile.codes.is_empty() && !profile.error_in_payload {
         push_error(errors, "error_profile.codes", "must include at least one status code when rate > 0", location.clone());
     }
 
@@ -135,6 +289,27 @@ fn validate_error_profile(profile: &ErrorProfile, errors: &mut Vec<ValidationErr
         if !is_valid_status(*code) {
             push_error(errors, "error_profile.codes", "invalid HTTP status code", location.clone());
             break;
+        }
+    }
+
+    if let Some(corruption) = &profile.payload_corruption {
+        if !corruption.rate.is_finite() || corruption.rate < 0.0 || corruption.rate > 1.0 {
+            push_error(errors, "error_profile.payload_corruption.rate", "must be between 0.0 and 1.0", location.clone());
+        }
+
+    match corruption.mode {
+            crate::config::CorruptionMode::Truncate => {
+                if let Some(ratio) = corruption.truncate_ratio {
+                    if !ratio.is_finite() || ratio <= 0.0 || ratio > 1.0 {
+                        push_error(errors, "error_profile.payload_corruption.truncate_ratio", "must be > 0 and <= 1", location.clone());
+                    }
+                }
+            }
+            crate::config::CorruptionMode::Replace => {
+                if corruption.replacement.as_deref().unwrap_or("").is_empty() {
+                    push_error(errors, "error_profile.payload_corruption.replacement", "must be provided for replace mode", location.clone());
+                }
+            }
         }
     }
 }
@@ -198,6 +373,11 @@ mod tests {
             latency,
             response: base_response(200),
             error_profile: ErrorProfile::default(),
+            rate_limit: None,
+            bandwidth_cap: None,
+            behavior_windows: vec![],
+            loaded_at: None,
+            rate_limiter: None,
         }
     }
 
@@ -314,6 +494,73 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_error_codes_not_required_for_payload_error() {
+        let mut config = base_config();
+        config.endpoints[0].error_profile.rate = 0.1;
+        config.endpoints[0].error_profile.codes.clear();
+        config.endpoints[0].error_profile.error_in_payload = true;
+        assert!(validate(&config).is_ok());
+    }
+
+    #[test]
+    fn test_validate_payload_corruption_rate() {
+        let mut config = base_config();
+        config.endpoints[0].error_profile.payload_corruption = Some(crate::config::PayloadCorruption {
+            rate: 2.0,
+            mode: crate::config::CorruptionMode::Truncate,
+            truncate_ratio: Some(0.5),
+            replacement: None,
+        });
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "error_profile.payload_corruption.rate"));
+    }
+
+    #[test]
+    fn test_validate_payload_corruption_replace_requires_value() {
+        let mut config = base_config();
+        config.endpoints[0].error_profile.payload_corruption = Some(crate::config::PayloadCorruption {
+            rate: 0.5,
+            mode: crate::config::CorruptionMode::Replace,
+            truncate_ratio: None,
+            replacement: None,
+        });
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "error_profile.payload_corruption.replacement"));
+    }
+
+    #[test]
+    fn test_validate_rate_limit_requests_per_second() {
+        let mut config = base_config();
+        config.endpoints[0].rate_limit = Some(crate::config::RateLimit {
+            requests_per_second: 0.0,
+            burst: Some(5.0),
+        });
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "rate_limit.requests_per_second"));
+    }
+
+    #[test]
+    fn test_validate_rate_limit_burst() {
+        let mut config = base_config();
+        config.endpoints[0].rate_limit = Some(crate::config::RateLimit {
+            requests_per_second: 10.0,
+            burst: Some(-1.0),
+        });
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "rate_limit.burst"));
+    }
+
+    #[test]
+    fn test_validate_bandwidth_cap() {
+        let mut config = base_config();
+        config.endpoints[0].bandwidth_cap = Some(crate::config::BandwidthCap {
+            bytes_per_second: 0.0,
+        });
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "bandwidth_cap.bytes_per_second"));
+    }
+
+    #[test]
     fn test_validate_error_codes_invalid() {
         let mut config = base_config();
         config.endpoints[0].error_profile.rate = 0.1;
@@ -388,6 +635,78 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_latency_log_normal_mean() {
+        let mut config = base_config();
+        config.endpoints[0].latency.distribution = DistributionType::LogNormal;
+        config.endpoints[0].latency.params = DistributionParams::LogNormal {
+            mean_ms: 0.0,
+            stddev_ms: 5.0,
+        };
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "latency.params.mean_ms"));
+    }
+
+    #[test]
+    fn test_validate_latency_log_normal_stddev() {
+        let mut config = base_config();
+        config.endpoints[0].latency.distribution = DistributionType::LogNormal;
+        config.endpoints[0].latency.params = DistributionParams::LogNormal {
+            mean_ms: 50.0,
+            stddev_ms: -1.0,
+        };
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "latency.params.stddev_ms"));
+    }
+
+    #[test]
+    fn test_validate_latency_mixture_empty_components() {
+        let mut config = base_config();
+        config.endpoints[0].latency.distribution = DistributionType::Mixture;
+        config.endpoints[0].latency.params = DistributionParams::Mixture { components: vec![] };
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "latency.params.components"));
+    }
+
+    #[test]
+    fn test_validate_latency_mixture_weight() {
+        let mut config = base_config();
+        config.endpoints[0].latency.distribution = DistributionType::Mixture;
+        config.endpoints[0].latency.params = DistributionParams::Mixture {
+            components: vec![MixtureComponent {
+                weight: 0.0,
+                distribution: DistributionType::Fixed,
+                params: Box::new(DistributionParams::Fixed { delay_ms: 5.0 }),
+            }],
+        };
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "latency.params.components.weight"));
+    }
+
+    #[test]
+    fn test_validate_latency_mixture_valid() {
+        let mut config = base_config();
+        config.endpoints[0].latency.distribution = DistributionType::Mixture;
+        config.endpoints[0].latency.params = DistributionParams::Mixture {
+            components: vec![
+                MixtureComponent {
+                    weight: 0.7,
+                    distribution: DistributionType::Fixed,
+                    params: Box::new(DistributionParams::Fixed { delay_ms: 5.0 }),
+                },
+                MixtureComponent {
+                    weight: 0.3,
+                    distribution: DistributionType::Normal,
+                    params: Box::new(DistributionParams::Normal {
+                        mean_ms: 50.0,
+                        stddev_ms: 10.0,
+                    }),
+                },
+            ],
+        };
+        assert!(validate(&config).is_ok());
+    }
+
+    #[test]
     fn test_validate_latency_distribution_mismatch() {
         let mut config = base_config();
         config.endpoints[0].latency.distribution = DistributionType::Normal;
@@ -405,5 +724,37 @@ mod tests {
         });
         let errors = validation_errors(&config);
         assert!(errors.iter().any(|e| e.field == "request.body"));
+    }
+
+    #[test]
+    fn test_validate_behavior_window_offsets() {
+        let mut config = base_config();
+        config.endpoints[0].behavior_windows = vec![BehaviorWindow {
+            start_offset_ms: 500.0,
+            end_offset_ms: 100.0,
+            latency_override: None,
+            error_profile_override: None,
+        }];
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "behavior_windows.end_offset_ms"));
+    }
+
+    #[test]
+    fn test_validate_behavior_window_latency_override() {
+        let mut config = base_config();
+        config.endpoints[0].behavior_windows = vec![BehaviorWindow {
+            start_offset_ms: 0.0,
+            end_offset_ms: 1000.0,
+            latency_override: Some(LatencyConfig {
+                distribution: DistributionType::Normal,
+                params: DistributionParams::Normal {
+                    mean_ms: 50.0,
+                    stddev_ms: 0.0,
+                },
+            }),
+            error_profile_override: None,
+        }];
+        let errors = validation_errors(&config);
+        assert!(errors.iter().any(|e| e.field == "latency.params.stddev_ms"));
     }
 }

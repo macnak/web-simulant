@@ -1,0 +1,35 @@
+version: "1.0"
+metadata:
+  name: "mixture-lognormal-latency"
+  description: "Tail latency and bimodal behavior"
+  author: "examples"
+  created: "2026-02-12T12:00:00Z"
+
+endpoints:
+  - id: "search"
+    method: "GET"
+    path: "/api/search"
+    latency:
+      distribution: "mixture"
+      params:
+        components:
+          - weight: 0.8
+            distribution: "fixed"
+            params:
+              delay_ms: 20
+          - weight: 0.2
+            distribution: "log_normal"
+            params:
+              mean_ms: 250
+              stddev_ms: 80
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+      body: '{"results": []}'
+    error_profile:
+      rate: 0.01
+      codes: [500]
+      body: '{"error": "Search failed"}'
+
+workflows: []

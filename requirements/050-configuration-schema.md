@@ -1,4 +1,4 @@
-# Configuration Schema - Phase 1
+# Configuration Schema - Phase 1 + Phase 2 Extensions
 
 ## Overview
 
@@ -81,6 +81,27 @@ Each endpoint simulates a specific API route with configurable behavior.
       {
         "error": "Internal server error"
       }
+
+  # Optional Phase 2 additions
+  rate_limit:
+    requests_per_second: 5
+    burst: 2
+
+  bandwidth_cap:
+    bytes_per_second: 10240 # 10 KB/s
+
+  behavior_windows:
+    - start_offset_ms: 30000
+      end_offset_ms: 60000
+      latency_override:
+        distribution: "uniform"
+        params:
+          min_ms: 200
+          max_ms: 800
+      error_profile_override:
+        rate: 0.1
+        codes: [503]
+        body: '{"error": "Degraded"}'
 ```
 
 ---
@@ -201,13 +222,46 @@ latency:
 
 Random latency within a range.
 
-```yaml
+````yaml
 latency:
   distribution: "uniform"
   params:
     min_ms: 50
     max_ms: 150
+
+### Log-normal Distribution (Phase 2)
+
+Long-tail behavior with occasional spikes.
+
+```yaml
+latency:
+  distribution: "log_normal"
+  params:
+    mean_ms: 150
+    stddev_ms: 60
+````
+
+### Mixture Distribution (Phase 2)
+
+Weighted blend of multiple distributions.
+
+```yaml
+latency:
+  distribution: "mixture"
+  params:
+    components:
+      - weight: 0.8
+        distribution: "fixed"
+        params:
+          delay_ms: 20
+      - weight: 0.2
+        distribution: "log_normal"
+        params:
+          mean_ms: 250
+          stddev_ms: 80
 ```
+
+````
 
 ---
 
@@ -222,16 +276,82 @@ error_profile:
   rate: 0.05 # 5% of requests fail
   codes: [500, 503] # Randomly select from these codes
   body: '{"error": "Service unavailable"}' # Response body on error
-```
+````
 
 ### No Errors
 
 Omit `error_profile` or set rate to 0:
 
-```yaml
+````yaml
 error_profile:
   rate: 0
+
+### Error-In-Payload (Phase 2)
+
+Return error payloads with HTTP 200.
+
+```yaml
+error_profile:
+  rate: 0.1
+  error_in_payload: true
+  body: '{"error": "Upstream timeout"}'
+````
+
+### Payload Corruption (Phase 2)
+
+Corrupt response bodies to test client resilience.
+
+```yaml
+error_profile:
+  payload_corruption:
+    rate: 0.2
+    mode: "truncate"
+    truncate_ratio: 0.4
 ```
+
+```yaml
+error_profile:
+  payload_corruption:
+    rate: 0.1
+    mode: "replace"
+    replacement: '{"error": "Malformed response"}'
+```
+
+---
+
+## Rate Limiting (Phase 2)
+
+```yaml
+rate_limit:
+  requests_per_second: 5
+  burst: 2
+```
+
+## Bandwidth Cap (Phase 2)
+
+```yaml
+bandwidth_cap:
+  bytes_per_second: 10240 # 10 KB/s
+```
+
+## Behavior Windows (Phase 2)
+
+```yaml
+behavior_windows:
+  - start_offset_ms: 30000
+    end_offset_ms: 60000
+    latency_override:
+      distribution: "uniform"
+      params:
+        min_ms: 200
+        max_ms: 800
+    error_profile_override:
+      rate: 0.1
+      codes: [503]
+      body: '{"error": "Degraded"}'
+```
+
+````
 
 ### Clustered Errors (Phase 2)
 
@@ -244,7 +364,7 @@ error_profile:
     enabled: true
     window_ms: 5000
     burst_probability: 0.8
-```
+````
 
 ---
 

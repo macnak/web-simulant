@@ -1,0 +1,49 @@
+version: "1.0"
+metadata:
+  name: "error-payload-corruption"
+  description: "Error-in-payload and payload corruption"
+  author: "examples"
+  created: "2026-02-12T12:00:00Z"
+
+endpoints:
+  - id: "profile"
+    method: "GET"
+    path: "/api/profile"
+    latency:
+      distribution: "fixed"
+      params:
+        delay_ms: 30
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+      body: '{"id": 1, "name": "Avery", "status": "active"}'
+    error_profile:
+      rate: 0.1
+      error_in_payload: true
+      body: '{"error": "Upstream timeout"}'
+      payload_corruption:
+        rate: 0.2
+        mode: "truncate"
+        truncate_ratio: 0.4
+
+  - id: "profile-replace"
+    method: "GET"
+    path: "/api/profile/replace"
+    latency:
+      distribution: "fixed"
+      params:
+        delay_ms: 30
+    response:
+      status: 200
+      headers:
+        Content-Type: "application/json"
+      body: '{"id": 2, "name": "Morgan", "status": "active"}'
+    error_profile:
+      rate: 0.0
+      payload_corruption:
+        rate: 0.15
+        mode: "replace"
+        replacement: '{"error": "Malformed response"}'
+
+workflows: []

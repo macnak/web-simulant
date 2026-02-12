@@ -13,7 +13,7 @@ Web API simulation application for performance testing. Simulates realistic API 
 - **[PROJECT-STATUS.md](PROJECT-STATUS.md)** ← Current state & daily progress
 - **[Quick Reference](QUICK-REFERENCE.md)** - Server connection & API endpoints
 - **[Configuration Schema](requirements/050-configuration-schema.md)** - APPROVED schema definition
-- **[Example Configs](examples/)** - 4 complete example configurations
+- **[Example Configs](examples/)** - 8 complete example configurations
 - **[API Documentation](bench/API.md)** - Complete endpoint reference
 - **[Benchmark Results](bench/RESULTS.md)** - Phase 0 validation results
 - **[Requirements](requirements/000-overview.md)** - Project overview
@@ -109,7 +109,7 @@ curl http://localhost:8080/health
 
 ## Latency Profiles
 
-Each endpoint uses a latency profile to shape response timing (Fixed, Normal, Exponential, Uniform). For detailed behavior notes, tuning guidance, and configuration examples, see [API.md](API.md).
+Each endpoint uses a latency profile to shape response timing (Fixed, Normal, Exponential, Uniform, Log-normal, Mixture). For detailed behavior notes, tuning guidance, and configuration examples, see [API.md](API.md).
 
 ## Features
 

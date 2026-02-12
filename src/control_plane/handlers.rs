@@ -284,25 +284,59 @@ fn map_validation_error(error: ValidationError) -> serde_json::Value {
 	value
 }
 
-fn to_summary(endpoint: &crate::config::Endpoint) -> EndpointSummary {
-	let latency = match &endpoint.latency.params {
+
+fn distribution_name(distribution: &crate::config::DistributionType) -> &'static str {
+	match distribution {
+		crate::config::DistributionType::Fixed => "fixed",
+		crate::config::DistributionType::Normal => "normal",
+		crate::config::DistributionType::Exponential => "exponential",
+		crate::config::DistributionType::Uniform => "uniform",
+		crate::config::DistributionType::LogNormal => "log_normal",
+		crate::config::DistributionType::Mixture => "mixture",
+	}
+}
+
+fn distribution_params(params: &crate::config::DistributionParams) -> serde_json::Value {
+	match params {
 		crate::config::DistributionParams::Fixed { delay_ms } => json!({
-			"distribution": "fixed",
-			"params": {"delay_ms": delay_ms}
+			"delay_ms": delay_ms
 		}),
 		crate::config::DistributionParams::Normal { mean_ms, stddev_ms } => json!({
-			"distribution": "normal",
-			"params": {"mean_ms": mean_ms, "stddev_ms": stddev_ms}
+			"mean_ms": mean_ms,
+			"stddev_ms": stddev_ms
 		}),
 		crate::config::DistributionParams::Exponential { rate } => json!({
-			"distribution": "exponential",
-			"params": {"rate": rate}
+			"rate": rate
 		}),
 		crate::config::DistributionParams::Uniform { min_ms, max_ms } => json!({
-			"distribution": "uniform",
-			"params": {"min_ms": min_ms, "max_ms": max_ms}
+			"min_ms": min_ms,
+			"max_ms": max_ms
 		}),
-	};
+		crate::config::DistributionParams::LogNormal { mean_ms, stddev_ms } => json!({
+			"mean_ms": mean_ms,
+			"stddev_ms": stddev_ms
+		}),
+		crate::config::DistributionParams::Mixture { components } => {
+			let components_json: Vec<serde_json::Value> = components
+				.iter()
+				.map(|component| {
+					json!({
+						"weight": component.weight,
+						"distribution": distribution_name(&component.distribution),
+						"params": distribution_params(component.params.as_ref())
+					})
+				})
+				.collect();
+			json!({"components": components_json})
+		}
+	}
+}
+
+fn to_summary(endpoint: &crate::config::Endpoint) -> EndpointSummary {
+	let latency = json!({
+		"distribution": distribution_name(&endpoint.latency.distribution),
+		"params": distribution_params(&endpoint.latency.params)
+	});
 
 	EndpointSummary {
 		id: endpoint.id.clone(),

@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 /// Top-level configuration structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +43,41 @@ pub struct Endpoint {
     pub response: Response,
     #[serde(default)]
     pub error_profile: ErrorProfile,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rate_limit: Option<RateLimit>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bandwidth_cap: Option<BandwidthCap>,
+    #[serde(default)]
+    pub behavior_windows: Vec<BehaviorWindow>,
+    #[serde(skip)]
+    pub loaded_at: Option<Instant>,
+    #[serde(skip)]
+    pub rate_limiter: Option<Arc<Mutex<TokenBucket>>>,
+}
+
+/// Time-window behavior overrides
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehaviorWindow {
+    pub start_offset_ms: f64,
+    pub end_offset_ms: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_override: Option<LatencyConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_profile_override: Option<ErrorProfile>,
+}
+
+/// Request rate limiting configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateLimit {
+    pub requests_per_second: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub burst: Option<f64>,
+}
+
+/// Bandwidth cap configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BandwidthCap {
+    pub bytes_per_second: f64,
 }
 
 /// HTTP methods
@@ -94,6 +131,8 @@ pub enum DistributionType {
     Normal,
     Exponential,
     Uniform,
+    LogNormal,
+    Mixture,
 }
 
 /// Distribution parameters (variant based on type)
@@ -114,6 +153,21 @@ pub enum DistributionParams {
         min_ms: f64,
         max_ms: f64,
     },
+    LogNormal {
+        mean_ms: f64,
+        stddev_ms: f64,
+    },
+    Mixture {
+        components: Vec<MixtureComponent>,
+    },
+}
+
+/// Mixture distribution component
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MixtureComponent {
+    pub weight: f64,
+    pub distribution: DistributionType,
+    pub params: Box<DistributionParams>,
 }
 
 /// Response configuration
@@ -140,6 +194,29 @@ pub struct ErrorProfile {
     pub codes: Vec<u16>,
     #[serde(default)]
     pub body: String,
+    #[serde(default)]
+    pub error_in_payload: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payload_corruption: Option<PayloadCorruption>,
+}
+
+/// Payload corruption settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PayloadCorruption {
+    pub rate: f64,
+    pub mode: CorruptionMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub truncate_ratio: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replacement: Option<String>,
+}
+
+/// Payload corruption mode
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CorruptionMode {
+    Truncate,
+    Replace,
 }
 
 impl Default for ErrorProfile {
@@ -148,6 +225,48 @@ impl Default for ErrorProfile {
             rate: 0.0,
             codes: vec![],
             body: String::new(),
+            error_in_payload: false,
+            payload_corruption: None,
+        }
+    }
+}
+
+/// Runtime token bucket for rate limiting (not serialized).
+#[derive(Debug)]
+pub struct TokenBucket {
+    capacity: f64,
+    tokens: f64,
+    refill_rate: f64,
+    last_refill: Instant,
+}
+
+impl TokenBucket {
+    pub fn new(requests_per_second: f64, burst: Option<f64>) -> Self {
+        let capacity = burst.unwrap_or(requests_per_second).max(0.0);
+        let refill_rate = requests_per_second.max(0.0);
+        Self {
+            capacity,
+            tokens: capacity,
+            refill_rate,
+            last_refill: Instant::now(),
+        }
+    }
+
+    pub fn try_take(&mut self) -> bool {
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_refill).as_secs_f64();
+        self.last_refill = now;
+
+        if elapsed > 0.0 && self.refill_rate > 0.0 {
+            let refill = elapsed * self.refill_rate;
+            self.tokens = (self.tokens + refill).min(self.capacity);
+        }
+
+        if self.tokens >= 1.0 {
+            self.tokens -= 1.0;
+            true
+        } else {
+            false
         }
     }
 }
